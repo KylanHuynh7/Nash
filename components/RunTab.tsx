@@ -37,6 +37,23 @@ export default function RunTab({
     [roster, present],
   );
 
+  const criticalLabel = useMemo(() => {
+    const key = config.criticalPosition;
+    return key
+      ? (config.positions.find((p) => p.key === key)?.full.toLowerCase() ?? key)
+      : "";
+  }, [config]);
+
+  const shortCritical = useMemo(() => {
+    const key = config.criticalPosition;
+    if (!key || !result) return 0;
+    return result.teams.filter(
+      (team) =>
+        team.players.length > 0 &&
+        !team.players.some((p) => p.position === key),
+    ).length;
+  }, [config, result]);
+
   const positionLabel = useMemo(
     () => new Map(config.positions.map((p) => [p.key, p.label])),
     [config],
@@ -286,6 +303,13 @@ export default function RunTab({
               </button>
             </div>
 
+            {shortCritical > 0 && (
+              <p className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                {shortCritical} team{shortCritical > 1 ? "s have" : " has"} no{" "}
+                {criticalLabel}. Mark someone else who can play it.
+              </p>
+            )}
+
             {result.unmet.length > 0 && (
               <p className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
                 Couldn&apos;t satisfy {result.unmet.length} rule
@@ -328,7 +352,11 @@ export default function RunTab({
               ))}
             </div>
 
-            <Button variant="ghost" onClick={share} className="w-full sm:max-w-xs">
+            <Button
+              variant="ghost"
+              onClick={share}
+              className="w-full sm:max-w-xs"
+            >
               {shareState === "saving"
                 ? "Saving…"
                 : shareState === "copied"

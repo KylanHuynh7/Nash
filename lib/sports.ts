@@ -26,6 +26,11 @@ export type SportConfig = {
   sideSize: number;
   attributes: Attribute[];
   positions: Position[];
+  /**
+   * A position each team needs at least one of. Balancing already spreads
+   * positions evenly, but this lets the UI warn when the group is short.
+   */
+  criticalPosition?: string;
   accent: string;
 };
 
@@ -54,22 +59,26 @@ export const SPORTS: Record<SportId, SportConfig> = {
   football: {
     id: "football",
     label: "Football",
-    emoji: "🏈",
+    emoji: "\u{1F3C8}",
     defaultTeams: 2,
     sideSize: 5,
     accent: "#22c55e",
+    criticalPosition: "qb",
     attributes: [
-      { key: "speed", label: "Speed", hint: "Straight-line burst and separation", weight: 1.1 },
-      { key: "hands", label: "Hands", hint: "Catching in traffic, contested grabs", weight: 1.1 },
-      { key: "throwing", label: "Throwing", hint: "Arm strength and accuracy", weight: 0.9 },
-      { key: "routes", label: "Routes", hint: "Cuts, timing, getting open", weight: 1.0 },
-      { key: "coverage", label: "Coverage", hint: "Sticking with a receiver, ball skills", weight: 1.1 },
-      { key: "iq", label: "Football IQ", hint: "Reads, spacing, situational awareness", weight: 0.9 },
+      { key: "hands", label: "Hands", hint: "Catching in traffic, contested grabs, drops", weight: 1.15 },
+      { key: "speed", label: "Speed", hint: "Straight-line burst, running past people", weight: 1.1 },
+      { key: "coverage", label: "Coverage", hint: "Man defense, jumping routes, picks", weight: 1.1 },
+      { key: "routes", label: "Routes", hint: "Shiftiness, cuts, getting open short", weight: 1.05 },
+      { key: "iq", label: "Football IQ", hint: "Spacing, reads, scrambling with the QB", weight: 0.9 },
+      // Only one player throws per possession, so a low weight here keeps a
+      // pocket-passer from being over-rated as an all-around player. Teams get
+      // a thrower via the QB position spread instead.
+      { key: "throwing", label: "Throwing", hint: "Arm strength and accuracy \u2014 QBs only", weight: 0.7 },
     ],
     positions: [
       { key: "qb", label: "QB", full: "Quarterback" },
-      { key: "skill", label: "SKL", full: "Skill / Receiver" },
-      { key: "rusher", label: "RSH", full: "Rusher / Line" },
+      { key: "receiver", label: "WR", full: "Receiver" },
+      { key: "rusher", label: "RSH", full: "Rusher" },
     ],
   },
 };
