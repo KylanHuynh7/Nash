@@ -13,6 +13,15 @@ import type { RosterEntry } from "@/app/actions";
 
 type Rule = Constraint & { kind: "together" | "apart" };
 
+/** Stable pseudo-random ordering for a given id and seed. */
+function jitter(id: string, seed: number): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return h / 0xffffffff;
+}
+
 export default function RunTab({
   config,
   roster,
@@ -27,6 +36,9 @@ export default function RunTab({
   const [result, setResult] = useState<BalanceResult | null>(null);
   const [seed, setSeed] = useState(1);
   const [rules, setRules] = useState<Rule[]>([]);
+  /** How many times each player has sat this session, so rotation stays fair. */
+  const [sitOutCounts, setSitOutCounts] = useState<Record<string, number>>({});
+  const [sitting, setSitting] = useState<RosterEntry[]>([]);
   const [showRules, setShowRules] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "saving" | "copied">(
     "idle",
@@ -36,6 +48,12 @@ export default function RunTab({
     () => roster.filter((p) => present.has(p.id)),
     [roster, present],
   );
+
+  // Even sides are the point: with 11 players and 2 teams that's 5v5 and one
+  // player sitting, not 6v5.
+  const perTeam =
+    here.length >= teamCount ? Math.floor(here.length / teamCount) : 0;
+  const sitCount = here.length - perTeam * teamCount;
 
   const criticalLabel = useMemo(() => {
     const key = config.criticalPosition;
@@ -71,10 +89,38 @@ export default function RunTab({
   }
 
   function generate(nextSeed: number) {
-    // Only apply rules whose players both actually showed up.
-    const active = rules.filter((r) => present.has(r.a) && present.has(r.b));
+    // Whoever has sat the fewest times goes first, so nobody sits twice before
+    // everyone has sat once. Ties break deterministically off the seed.
+    const ordered = [...here].sort((a, b) => {
+      const byTurns = (sitOutCounts[a.id] ?? 0) - (sitOutCounts[b.id] ?? 0);
+      if (byTurns !== 0) return byTurns;
+      return jitter(a.id, nextSeed) - jitter(b.id, nextSeed);
+    });
+
+    const benched = ordered.slice(0, sitCount);
+    const benchedIds = new Set(benched.map((p) => p.id));
+    const playing = here.filter((p) => !benchedIds.has(p.id));
+
+    if (benched.length > 0) {
+      setSitOutCounts((prev) => {
+        const next = { ...prev };
+        for (const p of benched) next[p.id] = (next[p.id] ?? 0) + 1;
+        return next;
+      });
+    }
+    setSitting(benched);
+
+    // Rules only bind players who are actually on the floor.
+    const active = rules.filter(
+      (r) =>
+        present.has(r.a) &&
+        present.has(r.b) &&
+        !benchedIds.has(r.a) &&
+        !benchedIds.has(r.b),
+    );
+
     setResult(
-      balanceTeams(here, {
+      balanceTeams(playing, {
         teamCount,
         seed: nextSeed,
         together: active.filter((r) => r.kind === "together"),
@@ -181,9 +227,9 @@ export default function RunTab({
           <div>
             <p className="text-sm font-medium">Teams</p>
             <p className="text-xs text-muted">
-              {here.length >= 2
-                ? `${Math.floor(here.length / teamCount)}${here.length % teamCount ? "–" + Math.ceil(here.length / teamCount) : ""} per side`
-                : "Pick at least 2 players"}
+              {here.length < teamCount
+                ? `Need at least ${teamCount} players`
+                : `${perTeam} per side${sitCount > 0 ? ` · ${sitCount} sitting` : ""}`}
             </p>
           </div>
           <div className="flex gap-1.5">
@@ -266,7 +312,7 @@ export default function RunTab({
 
         <Button
           onClick={() => generate(Math.floor(Math.random() * 1e9))}
-          disabled={here.length < 2}
+          disabled={here.length < teamCount}
           className="w-full py-4 text-base"
         >
           {result ? "Regenerate" : "Generate teams"}
@@ -351,6 +397,32 @@ export default function RunTab({
                 </div>
               ))}
             </div>
+
+            {sitting.length > 0 && (
+              <div className="rounded-2xl border border-line bg-surface/60 p-4">
+                <div className="mb-2 flex items-baseline justify-between">
+                  <h3 className="text-sm font-medium">Next up</h3>
+                  <span className="text-xs text-muted">sitting this game</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sitting.map((p) => (
+                    <span
+                      key={p.id}
+                      className="flex items-center gap-2 rounded-full border border-line bg-raised py-1.5 pl-3 pr-2.5 text-sm"
+                    >
+                      {p.name}
+                      <span className="font-mono text-xs tabular-nums text-muted">
+                        {p.overall}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-2.5 text-xs text-muted">
+                  Reshuffle rotates who sits — nobody sits twice until everyone
+                  has.
+                </p>
+              </div>
+            )}
 
             <Button
               variant="ghost"
