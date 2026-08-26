@@ -19,7 +19,7 @@ export default async function RunPage({ params }: PageProps<"/run/[id]">) {
   const positions = new Map(config.positions.map((p) => [p.key, p.label]));
 
   return (
-    <main className="mx-auto w-full max-w-md flex-1 px-5 pb-16 pt-6">
+    <main className="mx-auto w-full max-w-md flex-1 px-5 pb-16 pt-6 lg:max-w-3xl lg:px-8 lg:pt-10">
       <header className="mb-5">
         <Link href={`/${run.sport}`} className="text-sm text-muted hover:text-foreground">
           ← {config.label}
@@ -40,7 +40,7 @@ export default async function RunPage({ params }: PageProps<"/run/[id]">) {
         </p>
       </header>
 
-      <div className="grid gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {run.teams.map((team, i) => {
           const total = team.players.reduce((s, p) => s + p.overall, 0);
           const average = team.players.length

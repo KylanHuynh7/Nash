@@ -11,7 +11,8 @@ import {
 } from "@/lib/sports";
 import type { RosterEntry } from "@/app/actions";
 
-export type EditorTarget = { mode: "new" } | { mode: "edit"; player: RosterEntry };
+export type EditorTarget =
+  { mode: "new" } | { mode: "edit"; player: RosterEntry };
 
 export default function PlayerEditor({
   config,
@@ -35,7 +36,9 @@ export default function PlayerEditor({
 }) {
   const existing = target.mode === "edit" ? target.player : null;
   const [name, setName] = useState(existing?.name ?? "");
-  const [position, setPosition] = useState(existing?.position ?? config.positions[0].key);
+  const [position, setPosition] = useState(
+    existing?.position ?? config.positions[0].key,
+  );
   const [ratings, setRatings] = useState<Record<string, number>>(
     existing?.ratings ?? defaultRatings(config),
   );
@@ -58,7 +61,7 @@ export default function PlayerEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center">
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 pb-8 sm:rounded-3xl"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 pb-8 sm:max-w-2xl sm:rounded-3xl sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-label={existing ? `Edit ${existing.name}` : "Add player"}
@@ -72,57 +75,67 @@ export default function PlayerEditor({
           </div>
           <div className="flex flex-col items-center">
             <Rating value={overall} />
-            <span className="mt-1 text-[10px] uppercase tracking-wider text-muted">Overall</span>
+            <span className="mt-1 text-[10px] uppercase tracking-wider text-muted">
+              Overall
+            </span>
           </div>
         </div>
 
-        <label className="mt-5 block">
-          <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
-            Name
-          </span>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Who is it?"
-            autoFocus={!existing}
-            className="w-full rounded-xl border border-line bg-raised px-4 py-3 text-base outline-none placeholder:text-neutral-600 focus:border-accent"
-          />
-        </label>
+        <div className="sm:grid sm:grid-cols-2 sm:gap-x-7">
+          <label className="mt-5 block">
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+              Name
+            </span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Who is it?"
+              autoFocus={!existing}
+              className="w-full rounded-xl border border-line bg-raised px-4 py-3 text-base outline-none placeholder:text-neutral-600 focus:border-accent"
+            />
+          </label>
 
-        <fieldset className="mt-5">
-          <legend className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted">
-            Position
-          </legend>
-          <div className="flex gap-2">
-            {config.positions.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setPosition(p.key)}
-                aria-pressed={position === p.key}
-                className={`flex-1 rounded-xl border px-3 py-2.5 text-sm transition ${
-                  position === p.key
-                    ? "border-accent bg-accent/15 font-semibold text-accent"
-                    : "border-line bg-raised text-muted hover:border-neutral-600"
-                }`}
-              >
-                {p.full}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+          <fieldset className="mt-5">
+            <legend className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted">
+              Position
+            </legend>
+            <div className="flex gap-2">
+              {config.positions.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setPosition(p.key)}
+                  aria-pressed={position === p.key}
+                  className={`flex-1 rounded-xl border px-3 py-2.5 text-sm transition ${
+                    position === p.key
+                      ? "border-accent bg-accent/15 font-semibold text-accent"
+                      : "border-line bg-raised text-muted hover:border-neutral-600"
+                  }`}
+                >
+                  {p.full}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
 
-        <div className="mt-6 space-y-5">
+        <div className="mt-6 space-y-5 sm:grid sm:grid-cols-2 sm:gap-x-7 sm:gap-y-5 sm:space-y-0">
           {config.attributes.map((attr) => {
             const value = ratings[attr.key] ?? 70;
-            const fill = ((value - RATING_MIN) / (RATING_MAX - RATING_MIN)) * 100;
+            const fill =
+              ((value - RATING_MIN) / (RATING_MAX - RATING_MIN)) * 100;
             return (
               <div key={attr.key}>
                 <div className="flex items-baseline justify-between">
-                  <label htmlFor={`attr-${attr.key}`} className="text-sm font-medium">
+                  <label
+                    htmlFor={`attr-${attr.key}`}
+                    className="text-sm font-medium"
+                  >
                     {attr.label}
                   </label>
-                  <span className="font-mono text-sm tabular-nums text-muted">{value}</span>
+                  <span className="font-mono text-sm tabular-nums text-muted">
+                    {value}
+                  </span>
                 </div>
                 <input
                   id={`attr-${attr.key}`}
@@ -132,7 +145,10 @@ export default function PlayerEditor({
                   value={value}
                   style={{ ["--fill" as string]: `${fill}%` }}
                   onChange={(e) =>
-                    setRatings((prev) => ({ ...prev, [attr.key]: Number(e.target.value) }))
+                    setRatings((prev) => ({
+                      ...prev,
+                      [attr.key]: Number(e.target.value),
+                    }))
                   }
                   className="mt-1"
                 />
@@ -167,7 +183,11 @@ export default function PlayerEditor({
                 <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
                   No
                 </Button>
-                <Button variant="danger" onClick={() => onDelete(existing.id)} disabled={busy}>
+                <Button
+                  variant="danger"
+                  onClick={() => onDelete(existing.id)}
+                  disabled={busy}
+                >
                   Remove
                 </Button>
               </div>

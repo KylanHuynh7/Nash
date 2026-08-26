@@ -3,7 +3,7 @@ import { SPORTS, SPORT_IDS } from "@/lib/sports";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-5 py-16">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-5 py-16 sm:max-w-2xl">
       <header className="space-y-3">
         <h1 className="text-4xl font-bold tracking-tight">Run It Back</h1>
         <p className="text-[15px] leading-relaxed text-muted">
@@ -12,7 +12,7 @@ export default function Home() {
         </p>
       </header>
 
-      <nav className="flex flex-col gap-3">
+      <nav className="grid gap-3 sm:grid-cols-2">
         {SPORT_IDS.map((id) => {
           const sport = SPORTS[id];
           return (

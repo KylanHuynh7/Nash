@@ -57,7 +57,7 @@ export default function SportApp({
 
   return (
     <div
-      className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6"
+      className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6 lg:max-w-6xl lg:px-8 lg:pt-10"
       style={{ ["--accent" as string]: config.accent }}
     >
       <header className="mb-5 flex items-center justify-between">
@@ -83,7 +83,7 @@ export default function SportApp({
 
       <div
         role="tablist"
-        className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1"
+        className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1 lg:max-w-sm"
       >
         {(
           [
@@ -150,7 +150,7 @@ function RosterList({
   const positions = new Map(config.positions.map((p) => [p.key, p]));
 
   return (
-    <ul className="space-y-2">
+    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {roster.map((p) => (
         <li key={p.id}>
           <button

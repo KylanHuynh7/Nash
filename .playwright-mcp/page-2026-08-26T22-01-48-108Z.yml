@@ -1,0 +1,68 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - generic [ref=f1e4]:
+        - link "Back to sports" [ref=f1e5] [cursor=pointer]:
+          - /url: /
+          - text: ←
+        - heading "Basketball" [level=1] [ref=f1e6]: 🏀Basketball
+      - button "+ Player" [ref=f1e7]
+    - tablist [ref=f1e8]:
+      - tab "Run it" [selected] [ref=f1e9]
+      - tab "Roster · 12" [ref=f1e10]
+    - generic [ref=f1e11]:
+      - generic [ref=f1e12]:
+        - generic [ref=f1e13]:
+          - heading "Who's here" [level=2] [ref=f1e14]
+          - generic [ref=f1e15]:
+            - generic [ref=f1e16]: 0/12
+            - button "All" [ref=f1e17]
+        - generic [ref=f1e18]:
+          - button "Kylan 88" [ref=f1e19]:
+            - generic [ref=f1e20]: Kylan
+            - generic [ref=f1e21]: "88"
+          - button "Marcus 85" [ref=f1e22]:
+            - generic [ref=f1e23]: Marcus
+            - generic [ref=f1e24]: "85"
+          - button "Dre 83" [ref=f1e25]:
+            - generic [ref=f1e26]: Dre
+            - generic [ref=f1e27]: "83"
+          - button "Tyler 80" [ref=f1e28]:
+            - generic [ref=f1e29]: Tyler
+            - generic [ref=f1e30]: "80"
+          - button "Jalen 78" [ref=f1e31]:
+            - generic [ref=f1e32]: Jalen
+            - generic [ref=f1e33]: "78"
+          - button "Chris 76" [ref=f1e34]:
+            - generic [ref=f1e35]: Chris
+            - generic [ref=f1e36]: "76"
+          - button "Andre 73" [ref=f1e37]:
+            - generic [ref=f1e38]: Andre
+            - generic [ref=f1e39]: "73"
+          - button "Mike 71" [ref=f1e40]:
+            - generic [ref=f1e41]: Mike
+            - generic [ref=f1e42]: "71"
+          - button "Sam 69" [ref=f1e43]:
+            - generic [ref=f1e44]: Sam
+            - generic [ref=f1e45]: "69"
+          - button "Nate 66" [ref=f1e46]:
+            - generic [ref=f1e47]: Nate
+            - generic [ref=f1e48]: "66"
+          - button "Josh 62" [ref=f1e49]:
+            - generic [ref=f1e50]: Josh
+            - generic [ref=f1e51]: "62"
+          - button "Rob 57" [ref=f1e52]:
+            - generic [ref=f1e53]: Rob
+            - generic [ref=f1e54]: "57"
+      - generic [ref=f1e55]:
+        - generic [ref=f1e56]:
+          - paragraph [ref=f1e57]: Teams
+          - paragraph [ref=f1e58]: Pick at least 2 players
+        - generic [ref=f1e59]:
+          - button "2" [pressed] [ref=f1e60]
+          - button "3" [disabled] [ref=f1e61]
+          - button "4" [disabled] [ref=f1e62]
+      - button "Pairing rules" [ref=f1e64]:
+        - generic [ref=f1e66]: +
+      - button "Generate teams" [disabled] [ref=f1e67]
+  - button "Open Next.js Dev Tools" [ref=f1e73] [cursor=pointer]
