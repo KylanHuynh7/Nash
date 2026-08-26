@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button, Rating } from "@/components/ui";
 import {
+  RATING_DEFAULT,
   RATING_MAX,
   RATING_MIN,
   type SportConfig,
@@ -57,6 +58,12 @@ export default function PlayerEditor({
   }, [onClose]);
 
   const overall = computeOverall(config, ratings);
+
+  // Mirrors the sliders when they all agree, so the quick control shows the
+  // real value instead of snapping back to a default.
+  const values = config.attributes.map((a) => ratings[a.key] ?? RATING_DEFAULT);
+  const allEqual = values.every((v) => v === values[0]);
+  const quickValue = allEqual ? values[0] : overall;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center">
@@ -119,7 +126,39 @@ export default function PlayerEditor({
           </fieldset>
         </div>
 
-        <div className="mt-6 space-y-5 sm:grid sm:grid-cols-2 sm:gap-x-7 sm:gap-y-5 sm:space-y-0">
+        <div className="mt-6 rounded-2xl border border-line bg-raised/60 p-4">
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="quick-rate" className="text-sm font-medium">
+              Set everything at once
+            </label>
+            <span className="font-mono text-sm tabular-nums text-muted">
+              {quickValue}
+            </span>
+          </div>
+          <input
+            id="quick-rate"
+            type="range"
+            min={RATING_MIN}
+            max={RATING_MAX}
+            value={quickValue}
+            style={{
+              ["--fill" as string]: `${((quickValue - RATING_MIN) / (RATING_MAX - RATING_MIN)) * 100}%`,
+            }}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setRatings(
+                Object.fromEntries(config.attributes.map((a) => [a.key, next])),
+              );
+            }}
+            className="mt-1.5"
+          />
+          <p className="mt-0.5 text-xs text-muted">
+            Rough them in with one drag, then fine-tune below only where it
+            matters.
+          </p>
+        </div>
+
+        <div className="mt-5 space-y-5 sm:grid sm:grid-cols-2 sm:gap-x-7 sm:gap-y-5 sm:space-y-0">
           {config.attributes.map((attr) => {
             const value = ratings[attr.key] ?? 70;
             const fill =

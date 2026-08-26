@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { saveRun } from "@/app/actions";
-import { Button, EmptyState, Rating } from "@/components/ui";
+import { Button, EmptyState } from "@/components/ui";
+import TeamBoard, { boardSpread, type Board } from "@/components/TeamBoard";
 import {
   balanceTeams,
   type BalanceResult,
@@ -39,6 +40,9 @@ export default function RunTab({
   /** How many times each player has sat this session, so rotation stays fair. */
   const [sitOutCounts, setSitOutCounts] = useState<Record<string, number>>({});
   const [sitting, setSitting] = useState<RosterEntry[]>([]);
+  /** Editable copy of the generated teams; drag-and-drop writes here. */
+  const [board, setBoard] = useState<Board | null>(null);
+  const [edited, setEdited] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "saving" | "copied">(
     "idle",
@@ -62,15 +66,15 @@ export default function RunTab({
       : "";
   }, [config]);
 
+  const liveSpread = useMemo(() => (board ? boardSpread(board) : 0), [board]);
+
   const shortCritical = useMemo(() => {
     const key = config.criticalPosition;
-    if (!key || !result) return 0;
-    return result.teams.filter(
-      (team) =>
-        team.players.length > 0 &&
-        !team.players.some((p) => p.position === key),
+    if (!key || !board) return 0;
+    return board.teams.filter(
+      (team) => team.length > 0 && !team.some((p) => p.position === key),
     ).length;
-  }, [config, result]);
+  }, [config, board]);
 
   const positionLabel = useMemo(
     () => new Map(config.positions.map((p) => [p.key, p.label])),
@@ -85,6 +89,7 @@ export default function RunTab({
       return next;
     });
     setResult(null);
+    setBoard(null);
     setShareState("idle");
   }
 
@@ -119,26 +124,31 @@ export default function RunTab({
         !benchedIds.has(r.b),
     );
 
-    setResult(
-      balanceTeams(playing, {
-        teamCount,
-        seed: nextSeed,
-        together: active.filter((r) => r.kind === "together"),
-        apart: active.filter((r) => r.kind === "apart"),
-      }),
-    );
+    const next = balanceTeams(playing, {
+      teamCount,
+      seed: nextSeed,
+      together: active.filter((r) => r.kind === "together"),
+      apart: active.filter((r) => r.kind === "apart"),
+    });
+
+    setResult(next);
+    setBoard({
+      teams: next.teams.map((t) => t.players),
+      bench: benched,
+    });
+    setEdited(false);
     setSeed(nextSeed);
     setShareState("idle");
   }
 
   async function share() {
-    if (!result) return;
+    if (!board) return;
     setShareState("saving");
     try {
       const { id } = await saveRun({
         sport: config.id,
-        teams: result.teams.map((t) => ({ players: t.players })),
-        spread: result.spread,
+        teams: board.teams.map((players) => ({ players })),
+        spread: liveSpread,
       });
       const url = `${window.location.origin}/run/${id}`;
       if (navigator.share) {
@@ -189,6 +199,7 @@ export default function RunTab({
                       : new Set(roster.map((p) => p.id)),
                   );
                   setResult(null);
+                  setBoard(null);
                 }}
                 className="text-accent hover:underline"
               >
@@ -239,6 +250,7 @@ export default function RunTab({
                 onClick={() => {
                   setTeamCount(n);
                   setResult(null);
+                  setBoard(null);
                 }}
                 disabled={n > maxTeams}
                 aria-pressed={teamCount === n}
@@ -304,6 +316,7 @@ export default function RunTab({
                 onAdd={(rule) => {
                   setRules((prev) => [...prev, rule]);
                   setResult(null);
+                  setBoard(null);
                 }}
               />
             </div>
@@ -330,23 +343,42 @@ export default function RunTab({
           </div>
         )}
 
-        {result && (
+        {result && board && (
           <section className="space-y-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted">
                 Spread{" "}
                 <span
-                  className={`font-mono tabular-nums ${result.spread <= 1 ? "text-emerald-400" : result.spread <= 3 ? "text-amber-400" : "text-orange-400"}`}
+                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-400" : liveSpread <= 3 ? "text-amber-400" : "text-orange-400"}`}
                 >
-                  {result.spread.toFixed(1)}
+                  {liveSpread.toFixed(1)}
                 </span>
+                {edited && (
+                  <span className="ml-2 text-xs text-accent">edited</span>
+                )}
               </span>
-              <button
-                onClick={() => generate(seed + 1)}
-                className="text-accent hover:underline"
-              >
-                Reshuffle
-              </button>
+              <div className="flex items-center gap-3">
+                {edited && (
+                  <button
+                    onClick={() => {
+                      setBoard({
+                        teams: result.teams.map((t) => t.players),
+                        bench: sitting,
+                      });
+                      setEdited(false);
+                    }}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Undo edits
+                  </button>
+                )}
+                <button
+                  onClick={() => generate(seed + 1)}
+                  className="text-accent hover:underline"
+                >
+                  Reshuffle
+                </button>
+              </div>
             </div>
 
             {shortCritical > 0 && (
@@ -356,73 +388,26 @@ export default function RunTab({
               </p>
             )}
 
-            {result.unmet.length > 0 && (
+            {result.unmet.length > 0 && !edited && (
               <p className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
                 Couldn&apos;t satisfy {result.unmet.length} rule
                 {result.unmet.length > 1 ? "s" : ""} with this group.
               </p>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {result.teams.map((team, i) => (
-                <div
-                  key={i}
-                  className="rounded-2xl border border-line bg-surface p-4"
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-semibold">Team {i + 1}</h3>
-                    <div className="flex items-center gap-2 text-xs text-muted">
-                      <span className="font-mono tabular-nums">
-                        avg {team.average}
-                      </span>
-                      <Rating value={Math.round(team.average)} size="sm" />
-                    </div>
-                  </div>
-                  <ul className="space-y-1.5">
-                    {team.players.map((p) => (
-                      <li
-                        key={p.id}
-                        className="flex items-center gap-2.5 text-sm"
-                      >
-                        <span className="w-8 shrink-0 font-mono text-[10px] uppercase text-muted">
-                          {positionLabel.get(p.position) ?? p.position}
-                        </span>
-                        <span className="flex-1">{p.name}</span>
-                        <span className="font-mono text-xs tabular-nums text-muted">
-                          {p.overall}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            <TeamBoard
+              board={board}
+              positionLabel={positionLabel}
+              onChange={(next) => {
+                setBoard(next);
+                setEdited(true);
+              }}
+            />
 
-            {sitting.length > 0 && (
-              <div className="rounded-2xl border border-line bg-surface/60 p-4">
-                <div className="mb-2 flex items-baseline justify-between">
-                  <h3 className="text-sm font-medium">Next up</h3>
-                  <span className="text-xs text-muted">sitting this game</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sitting.map((p) => (
-                    <span
-                      key={p.id}
-                      className="flex items-center gap-2 rounded-full border border-line bg-raised py-1.5 pl-3 pr-2.5 text-sm"
-                    >
-                      {p.name}
-                      <span className="font-mono text-xs tabular-nums text-muted">
-                        {p.overall}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-2.5 text-xs text-muted">
-                  Reshuffle rotates who sits — nobody sits twice until everyone
-                  has.
-                </p>
-              </div>
-            )}
+            <p className="text-center text-xs text-muted">
+              Drag anyone between teams or down to Next up — the spread updates
+              as you go.
+            </p>
 
             <Button
               variant="ghost"
