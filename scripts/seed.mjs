@@ -34,7 +34,6 @@ const DEMO = [
 ];
 
 const KEYS = ["shooting", "finishing", "playmaking", "defense", "rebounding", "athleticism"];
-const WEIGHTS = [1.15, 1.1, 1.05, 1.1, 0.85, 0.95];
 
 for (const [name, position, base] of DEMO) {
   const ratings = Object.fromEntries(KEYS.map((k) => [k, base]));
