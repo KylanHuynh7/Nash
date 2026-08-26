@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Run It Back
 
-## Getting Started
+Pickup teams without re-prompting a chatbot every week. The roster is stored once;
+each session you tap who showed up and get balanced teams.
 
-First, run the development server:
+## How it works
+
+- **Roster** — each person is rated 25–99 on six sport-specific attributes, which
+  roll up into a weighted overall. One person, one row — a friend who hoops *and*
+  plays football has two profiles under the same name.
+- **Run it** — tap who's here, choose 2–4 teams, generate.
+- **Balancing** — `lib/balance.ts` runs 240 randomized greedy drafts, each refined
+  by hill-climbing swaps. It optimises team strength, roster size, and position
+  spread simultaneously, and honours "keep these two together / apart" rules.
+  Pure math, no API call: ~18ms for 12 players.
+- **Share** — a generated matchup can be saved to a short link. Teams are stored
+  as a snapshot, so an old link keeps showing the ratings the teams were built from.
+
+## Local setup
 
 ```bash
+npm install
+vercel link                      # once
+vercel env pull .env.local       # pulls DATABASE_URL from the Neon integration
+npx dotenv -e .env.local -- npx drizzle-kit push
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Adding a sport
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Add an entry to `SPORTS` in `lib/sports.ts` — attributes, weights, and positions.
+Everything else (roster UI, editor sliders, balancing, share pages) reads from
+that config, so no other file needs to change.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Checking the balancer
 
-## Learn More
+```bash
+npx tsx scripts/balance-check.ts
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Prints team splits, spreads, and constraint handling for a sample 12-player pool.
