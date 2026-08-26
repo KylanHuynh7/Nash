@@ -15,7 +15,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
-import { Rating } from "@/components/ui";
+import { Rating, teamColor } from "@/components/ui";
 import type { BalancePlayer } from "@/lib/balance";
 
 export type Board = {
@@ -53,7 +53,8 @@ function move(board: Board, playerId: string, to: string): Board {
   const player = all.find((p) => p.id === playerId);
   if (!player) return board;
 
-  const strip = (list: BalancePlayer[]) => list.filter((p) => p.id !== playerId);
+  const strip = (list: BalancePlayer[]) =>
+    list.filter((p) => p.id !== playerId);
   const teams = board.teams.map(strip);
   let bench = strip(board.bench);
 
@@ -62,7 +63,9 @@ function move(board: Board, playerId: string, to: string): Board {
   } else {
     const index = Number(to.slice("team-".length));
     if (!Number.isInteger(index) || !teams[index]) return board;
-    teams[index] = [...teams[index], player].sort((a, b) => b.overall - a.overall);
+    teams[index] = [...teams[index], player].sort(
+      (a, b) => b.overall - a.overall,
+    );
   }
 
   return { teams, bench };
@@ -89,7 +92,8 @@ export default function TeamBoard({
   );
 
   const sizes = board.teams.map((t) => t.length);
-  const uneven = sizes.length > 1 && Math.max(...sizes) - Math.min(...sizes) > 0;
+  const uneven =
+    sizes.length > 1 && Math.max(...sizes) - Math.min(...sizes) > 0;
 
   function handleStart(event: DragStartEvent) {
     const all = [...board.teams.flat(), ...board.bench];
@@ -117,7 +121,8 @@ export default function TeamBoard({
           <Column
             key={teamId(i)}
             id={teamId(i)}
-            title={`Team ${i + 1}`}
+            title={teamColor(i).label}
+            colorIndex={i}
             players={players}
             positionLabel={positionLabel}
             flagSize={uneven}
@@ -136,7 +141,7 @@ export default function TeamBoard({
 
       <DragOverlay dropAnimation={null}>
         {dragging && (
-          <div className="flex w-56 cursor-grabbing items-center gap-2.5 rounded-xl border border-accent bg-raised px-3 py-2 text-sm shadow-2xl">
+          <div className="flex w-56 rotate-1 cursor-grabbing items-center gap-2.5 rounded-xl border border-accent bg-surface px-3 py-2 text-sm shadow-[var(--shadow-lift)]">
             <span className="w-8 shrink-0 font-mono text-[10px] uppercase text-muted">
               {positionLabel.get(dragging.position) ?? dragging.position}
             </span>
@@ -159,6 +164,7 @@ function Column({
   positionLabel,
   muted,
   flagSize,
+  colorIndex,
 }: {
   id: string;
   title: string;
@@ -167,6 +173,7 @@ function Column({
   positionLabel: Map<string, string>;
   muted?: boolean;
   flagSize?: boolean;
+  colorIndex?: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const average = useMemo(() => teamAverage(players), [players]);
@@ -174,21 +181,31 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-2xl border p-4 transition-colors ${
+      className={`rounded-2xl border p-4 shadow-[var(--shadow-card)] transition ${
         isOver
-          ? "border-accent bg-accent/10"
+          ? "border-accent bg-accent-wash ring-2 ring-accent/20"
           : muted
-            ? "border-line bg-surface/60"
+            ? "border-dashed border-line-strong bg-sunken"
             : "border-line bg-surface"
       }`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="font-semibold">{title}</h3>
+        <h3 className="flex items-center gap-2 font-semibold">
+          {colorIndex !== undefined && (
+            <span
+              aria-hidden
+              className={`h-2.5 w-2.5 rounded-full ${teamColor(colorIndex).dot}`}
+            />
+          )}
+          {title}
+        </h3>
         {subtitle ? (
           <span className="text-xs text-muted">{subtitle}</span>
         ) : (
           <div className="flex items-center gap-2 text-xs text-muted">
-            <span className={`font-mono tabular-nums ${flagSize ? "text-amber-400" : ""}`}>
+            <span
+              className={`font-mono tabular-nums ${flagSize ? "font-semibold text-amber-600" : ""}`}
+            >
               {players.length} · avg {average}
             </span>
             <Rating value={Math.round(average)} size="sm" />
@@ -228,7 +245,7 @@ function PlayerRow({
       className={`flex touch-none items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition ${
         isDragging
           ? "opacity-30"
-          : "cursor-grab hover:bg-raised active:cursor-grabbing"
+          : "cursor-grab hover:bg-sunken active:cursor-grabbing"
       }`}
     >
       <span className="w-8 shrink-0 font-mono text-[10px] uppercase text-muted">

@@ -66,9 +66,9 @@ export default function PlayerEditor({
   const quickValue = allEqual ? values[0] : overall;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center">
       <div
-        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 pb-8 sm:max-w-2xl sm:rounded-3xl sm:p-6"
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 pb-8 shadow-[var(--shadow-lift)] sm:max-w-2xl sm:rounded-3xl sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-label={existing ? `Edit ${existing.name}` : "Add player"}
@@ -98,7 +98,7 @@ export default function PlayerEditor({
               onChange={(e) => setName(e.target.value)}
               placeholder="Who is it?"
               autoFocus={!existing}
-              className="w-full rounded-xl border border-line bg-raised px-4 py-3 text-base outline-none placeholder:text-neutral-600 focus:border-accent"
+              className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/15"
             />
           </label>
 
@@ -115,8 +115,8 @@ export default function PlayerEditor({
                   aria-pressed={position === p.key}
                   className={`flex-1 rounded-xl border px-3 py-2.5 text-sm transition ${
                     position === p.key
-                      ? "border-accent bg-accent/15 font-semibold text-accent"
-                      : "border-line bg-raised text-muted hover:border-neutral-600"
+                      ? "border-accent-line bg-accent-wash font-semibold text-accent-strong"
+                      : "border-line bg-surface text-muted hover:border-line-strong hover:text-foreground"
                   }`}
                 >
                   {p.full}
@@ -126,7 +126,7 @@ export default function PlayerEditor({
           </fieldset>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-line bg-raised/60 p-4">
+        <div className="mt-6 rounded-2xl border border-accent-line bg-accent-wash/60 p-4">
           <div className="flex items-baseline justify-between">
             <label htmlFor="quick-rate" className="text-sm font-medium">
               Set everything at once
@@ -215,8 +215,8 @@ export default function PlayerEditor({
         {existing && onDelete && (
           <div className="mt-3">
             {confirmDelete ? (
-              <div className="flex items-center gap-2 rounded-xl border border-red-900/70 bg-red-950/30 p-2.5">
-                <span className="flex-1 pl-1 text-sm text-red-200">
+              <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5">
+                <span className="flex-1 pl-1 text-sm text-rose-700">
                   Remove {existing.name} from {config.label.toLowerCase()}?
                 </span>
                 <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
@@ -234,7 +234,7 @@ export default function PlayerEditor({
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="w-full py-2 text-sm text-muted transition hover:text-red-300"
+                className="w-full py-2 text-sm text-muted transition hover:text-rose-600"
               >
                 Remove from roster
               </button>

@@ -76,14 +76,18 @@ export default function SportApp({
             {config.label}
           </h1>
         </div>
-        <Button variant="ghost" onClick={() => setEditor({ mode: "new" })} className="!px-3 !py-2">
+        <Button
+          variant="ghost"
+          onClick={() => setEditor({ mode: "new" })}
+          className="!px-3 !py-2"
+        >
           + Player
         </Button>
       </header>
 
       <div
         role="tablist"
-        className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1 lg:max-w-sm"
+        className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-sunken p-1 shadow-inner lg:max-w-sm"
       >
         {(
           [
@@ -97,7 +101,9 @@ export default function SportApp({
             aria-selected={tab === key}
             onClick={() => setTab(key)}
             className={`rounded-lg py-2.5 text-sm transition ${
-              tab === key ? "bg-raised font-semibold text-foreground" : "text-muted"
+              tab === key
+                ? "bg-surface font-semibold text-foreground shadow-sm"
+                : "text-muted hover:text-foreground"
             }`}
           >
             {label}
@@ -112,7 +118,11 @@ export default function SportApp({
           onAddPlayer={() => setEditor({ mode: "new" })}
         />
       ) : (
-        <RosterList config={config} roster={roster} onEdit={(p) => setEditor({ mode: "edit", player: p })} />
+        <RosterList
+          config={config}
+          roster={roster}
+          onEdit={(p) => setEditor({ mode: "edit", player: p })}
+        />
       )}
 
       {editor && (
@@ -155,7 +165,7 @@ function RosterList({
         <li key={p.id}>
           <button
             onClick={() => onEdit(p)}
-            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left transition hover:border-neutral-600 active:bg-raised"
+            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left shadow-[var(--shadow-card)] transition hover:border-accent-line hover:shadow-md active:translate-y-px"
           >
             <Rating value={p.overall} />
             <span className="min-w-0 flex-1">

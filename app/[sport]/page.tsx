@@ -32,11 +32,11 @@ export default async function SportPage({ params }: PageProps<"/[sport]">) {
         <Link href="/" className="text-sm text-muted hover:text-foreground">
           ← Back
         </Link>
-        <div className="mt-6 rounded-2xl border border-amber-900/60 bg-amber-950/30 p-5">
-          <h1 className="text-lg font-semibold text-amber-200">
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <h1 className="text-lg font-semibold text-amber-900">
             Database not connected yet
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-amber-100/70">
+          <p className="mt-2 text-sm leading-relaxed text-amber-800">
             {setupError}
           </p>
         </div>

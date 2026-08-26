@@ -224,7 +224,7 @@ export default function RunTab({
                 >
                   <span className={on ? "font-medium" : ""}>{p.name}</span>
                   <span
-                    className={`font-mono text-xs tabular-nums ${on ? "text-accent" : "text-neutral-600"}`}
+                    className={`font-mono text-xs tabular-nums ${on ? "text-accent" : "text-muted"}`}
                   >
                     {p.overall}
                   </span>
@@ -234,7 +234,7 @@ export default function RunTab({
           </div>
         </section>
 
-        <section className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3">
+        <section className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
           <div>
             <p className="text-sm font-medium">Teams</p>
             <p className="text-xs text-muted">
@@ -276,7 +276,7 @@ export default function RunTab({
           </button>
 
           {showRules && (
-            <div className="mt-2 space-y-2 rounded-2xl border border-line bg-surface p-3">
+            <div className="mt-2 space-y-2 rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-card)]">
               {rules.length === 0 && (
                 <p className="px-1 py-1 text-xs leading-relaxed text-muted">
                   Force two people onto the same team, or keep them apart. Rules
@@ -289,7 +289,7 @@ export default function RunTab({
                 return (
                   <div
                     key={i}
-                    className="flex items-center gap-2 rounded-xl bg-raised px-3 py-2 text-sm"
+                    className="flex items-center gap-2 rounded-xl bg-sunken px-3 py-2 text-sm"
                   >
                     <span className="flex-1">
                       {a?.name}{" "}
@@ -304,7 +304,7 @@ export default function RunTab({
                         setResult(null);
                       }}
                       aria-label="Remove rule"
-                      className="px-1 text-muted hover:text-red-300"
+                      className="px-1 text-muted hover:text-rose-600"
                     >
                       ✕
                     </button>
@@ -334,7 +334,7 @@ export default function RunTab({
 
       <div className="mt-6 lg:mt-0">
         {!result && (
-          <div className="hidden h-full min-h-64 place-content-center rounded-2xl border border-dashed border-line px-6 text-center lg:grid">
+          <div className="hidden h-full min-h-64 place-content-center rounded-2xl border border-dashed border-line-strong bg-surface/50 px-6 text-center lg:grid">
             <p className="text-sm text-muted">
               {here.length < 2
                 ? "Tap who showed up to get started."
@@ -349,7 +349,7 @@ export default function RunTab({
               <span className="text-muted">
                 Spread{" "}
                 <span
-                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-400" : liveSpread <= 3 ? "text-amber-400" : "text-orange-400"}`}
+                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-600" : liveSpread <= 3 ? "text-amber-600" : "text-rose-600"}`}
                 >
                   {liveSpread.toFixed(1)}
                 </span>
@@ -382,14 +382,14 @@ export default function RunTab({
             </div>
 
             {shortCritical > 0 && (
-              <p className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 {shortCritical} team{shortCritical > 1 ? "s have" : " has"} no{" "}
                 {criticalLabel}. Mark someone else who can play it.
               </p>
             )}
 
             {result.unmet.length > 0 && !edited && (
-              <p className="rounded-xl border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 Couldn&apos;t satisfy {result.unmet.length} rule
                 {result.unmet.length > 1 ? "s" : ""} with this group.
               </p>
@@ -439,7 +439,7 @@ function RuleBuilder({
   const [kind, setKind] = useState<"together" | "apart">("together");
 
   const select =
-    "min-w-0 flex-1 rounded-lg border border-line bg-raised px-2 py-2 text-sm outline-none focus:border-accent";
+    "min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-2 text-sm outline-none focus:border-accent";
 
   return (
     <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -460,7 +460,7 @@ function RuleBuilder({
         onClick={() =>
           setKind((k) => (k === "together" ? "apart" : "together"))
         }
-        className="rounded-lg border border-line bg-raised px-2.5 py-2 text-xs text-accent"
+        className="rounded-lg border border-line bg-surface px-2.5 py-2 text-xs font-medium text-accent"
       >
         {kind === "together" ? "with" : "vs"}
       </button>

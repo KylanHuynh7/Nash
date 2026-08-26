@@ -21,7 +21,7 @@ export default function Home() {
               <div
                 key={id}
                 aria-disabled
-                className="flex items-center gap-4 rounded-2xl border border-line bg-surface/40 px-5 py-5 opacity-45"
+                className="flex items-center gap-4 rounded-2xl border border-dashed border-line-strong bg-sunken px-5 py-5 opacity-70"
               >
                 <span aria-hidden className="text-3xl grayscale">
                   {sport.emoji}
@@ -40,7 +40,7 @@ export default function Home() {
             <Link
               key={id}
               href={`/${id}`}
-              className="group flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-5 transition-colors hover:border-neutral-600 active:bg-raised"
+              className="group flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-accent-line hover:shadow-md"
             >
               <span aria-hidden className="text-3xl">
                 {sport.emoji}

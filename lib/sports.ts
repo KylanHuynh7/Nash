@@ -43,7 +43,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     emoji: "🏀",
     defaultTeams: 2,
     sideSize: 5,
-    accent: "#f97316",
+    accent: "#4f46e5",
     attributes: [
       {
         key: "shooting",
@@ -94,7 +94,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     emoji: "\u{1F3C8}",
     defaultTeams: 2,
     sideSize: 5,
-    accent: "#22c55e",
+    accent: "#0d9488",
     criticalPosition: "qb",
     comingSoon: true,
     attributes: [
