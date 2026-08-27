@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { saveRun } from "@/app/actions";
-import { Button, EmptyState } from "@/components/ui";
-import TeamBoard, { boardSpread, type Board } from "@/components/TeamBoard";
+import { Button, EmptyState, teamColor } from "@/components/ui";
+import TeamBoard, {
+  boardSpread,
+  teamAverage,
+  type Board,
+} from "@/components/TeamBoard";
 import {
   balanceTeams,
   type BalanceResult,
@@ -47,6 +51,10 @@ export default function RunTab({
   const [board, setBoard] = useState<Board | null>(null);
   const [edited, setEdited] = useState(false);
   const [view, setView] = useState<"list" | "court">("court");
+  /** Winner-stays-on: which side is holding the court, and for how long. */
+  const [streak, setStreak] = useState<{ team: number; count: number } | null>(
+    null,
+  );
   const [showRules, setShowRules] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "saving" | "copied">(
     "idle",
@@ -96,6 +104,7 @@ export default function RunTab({
   function clearResult() {
     setResult(null);
     setBoard(null);
+    setStreak(null);
     setShareState("idle");
   }
 
@@ -165,6 +174,56 @@ export default function RunTab({
     setEdited(false);
     setSeed(nextSeed);
     setShareState("idle");
+  }
+
+  function recordWin(winnerIndex: number) {
+    if (!board) return;
+
+    const winners = board.teams[winnerIndex];
+    const losers = board.teams[1 - winnerIndex] ?? [];
+    const wait = (p: { id: string }) => sitOutCounts[p.id] ?? 0;
+
+    // Losers line up behind everyone already waiting.
+    const queue = [...board.bench, ...losers].sort(
+      (a, b) => wait(b) - wait(a) || jitter(a.id, seed) - jitter(b.id, seed),
+    );
+    const challengers = queue.slice(0, winners.length);
+    const waiting = queue.slice(winners.length);
+
+    if (waiting.length > 0) {
+      setSitOutCounts((prev) => {
+        const next = { ...prev };
+        for (const p of waiting) next[p.id] = (next[p.id] ?? 0) + 1;
+        return next;
+      });
+    }
+
+    const teams = [...board.teams];
+    teams[winnerIndex] = winners;
+    teams[1 - winnerIndex] = challengers;
+
+    setBoard({ teams, bench: waiting, pinned: [] });
+    setSitting(roster.filter((p) => waiting.some((w) => w.id === p.id)));
+    setPlaying(new Set([...winners, ...challengers].map((p) => p.id)));
+
+    // The new matchup is the baseline now, so undo has nothing stale to revert to.
+    setResult({
+      teams: teams.map((players) => ({
+        players,
+        total: players.reduce((sum, p) => sum + p.overall, 0),
+        average: teamAverage(players),
+      })),
+      spread: 0,
+      unmet: [],
+    });
+    setEdited(false);
+    setShareState("idle");
+
+    setStreak((prev) =>
+      prev && prev.team === winnerIndex
+        ? { team: winnerIndex, count: prev.count + 1 }
+        : { team: winnerIndex, count: 1 },
+    );
   }
 
   async function share() {
@@ -505,6 +564,45 @@ export default function RunTab({
                 setEdited(true);
               }}
             />
+
+            <div className="rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-card)]">
+              <div className="mb-2 flex items-baseline justify-between px-0.5">
+                <span className="text-sm font-medium">Who won?</span>
+                {streak && streak.count > 1 && (
+                  <span className="text-xs text-muted">
+                    <span
+                      className={`font-semibold ${teamColor(streak.team).chip.split(" ")[1]}`}
+                    >
+                      {teamColor(streak.team).label}
+                    </span>{" "}
+                    on {streak.count} straight
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {board.teams.map((team, i) => {
+                  const color = teamColor(i);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => recordWin(i)}
+                      disabled={team.length === 0}
+                      className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition disabled:opacity-40 ${color.chip} hover:brightness-95 active:translate-y-px`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`h-2 w-2 rounded-full ${color.dot}`}
+                      />
+                      {color.label} won
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 px-0.5 text-center text-[11px] text-muted">
+                Winners hold the court. Losers go to the back of the line and
+                the longest waits come on.
+              </p>
+            </div>
 
             <p className="text-center text-xs text-muted">
               {view === "court"
