@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { removePlayer, savePlayer, type RosterEntry } from "@/app/actions";
 import PasscodeGate from "@/components/PasscodeGate";
+import PlayerCard from "@/components/PlayerCard";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
 import { Button, EmptyState, Rating } from "@/components/ui";
@@ -23,12 +24,15 @@ export default function SportApp({
   const [tab, setTab] = useState<Tab>("run");
   const [roster, setRoster] = useState(initialRoster);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
+  /** The player whose ratings are being read. Viewing is never gated. */
+  const [viewing, setViewing] = useState<RosterEntry | null>(null);
   const [unlocked, setUnlocked] = useState(!access.gated || access.unlocked);
   /** Held while the passcode is asked for, then opened once it's accepted. */
   const [afterUnlock, setAfterUnlock] = useState<EditorTarget | null>(null);
 
   /** Editing is gated, so route every entry point through the same check. */
   function requestEdit(target: EditorTarget) {
+    setViewing(null);
     if (unlocked) setEditor(target);
     else setAfterUnlock(target);
   }
@@ -83,26 +87,30 @@ export default function SportApp({
         } as React.CSSProperties
       }
     >
-      <header className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <header className="mb-5 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/"
             aria-label="Back to sports"
-            className="text-muted transition hover:text-foreground"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-line bg-surface text-muted shadow-[var(--shadow-card)] transition hover:border-accent-line hover:text-foreground"
           >
             ←
           </Link>
+          {/* The sport's colour has to appear somewhere solid, or the accent
+              only ever exists as a tint nobody registers. */}
           <h1 className="text-xl font-bold tracking-tight">
             <span aria-hidden className="mr-1.5">
               {config.emoji}
             </span>
             {config.label}
           </h1>
+          <div className="min-w-0">
+          </div>
         </div>
         <Button
           variant="ghost"
           onClick={() => requestEdit({ mode: "new" })}
-          className="!px-3 !py-2"
+          className="shrink-0 !px-3 !py-2"
         >
           + Player
         </Button>
@@ -141,10 +149,17 @@ export default function SportApp({
           onAddPlayer={() => requestEdit({ mode: "new" })}
         />
       ) : (
-        <RosterList
+        <RosterList config={config} roster={roster} onOpen={setViewing} />
+      )}
+
+      {viewing && (
+        <PlayerCard
           config={config}
-          roster={roster}
-          onEdit={(p) => requestEdit({ mode: "edit", player: p })}
+          player={viewing}
+          rank={roster.findIndex((p) => p.id === viewing.id) + 1}
+          of={roster.length}
+          onClose={() => setViewing(null)}
+          onEdit={() => requestEdit({ mode: "edit", player: viewing })}
         />
       )}
 
@@ -176,11 +191,11 @@ export default function SportApp({
 function RosterList({
   config,
   roster,
-  onEdit,
+  onOpen,
 }: {
   config: SportConfig;
   roster: RosterEntry[];
-  onEdit: (player: RosterEntry) => void;
+  onOpen: (player: RosterEntry) => void;
 }) {
   if (roster.length === 0) {
     return (
@@ -195,25 +210,29 @@ function RosterList({
 
   return (
     <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {roster.map((p) => (
+      {roster.map((p, i) => (
         <li key={p.id}>
           <button
-            onClick={() => onEdit(p)}
+            onClick={() => onOpen(p)}
             className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left shadow-[var(--shadow-card)] transition hover:border-accent-line hover:shadow-md active:translate-y-px"
           >
-            <Rating value={p.overall} />
+            {/* The list is sorted by rating, so say so — otherwise the order is
+                information the eye has to reconstruct from the numbers. */}
+            <span className="figure w-6 shrink-0 text-center text-xs font-semibold text-muted/70">
+              {i + 1}
+            </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">{p.name}</span>
-              <span className="block text-xs text-muted">
+              <span className="block truncate text-[15px] font-semibold tracking-[-0.01em]">
+                {p.name}
+              </span>
+              <span className="block truncate text-xs text-muted">
                 {positions.get(p.position)?.full ?? p.position}
                 {formatHeight(p.heightInches) && (
                   <> · {formatHeight(p.heightInches)}</>
                 )}
               </span>
             </span>
-            <span aria-hidden className="text-muted">
-              ›
-            </span>
+            <Rating value={p.overall} />
           </button>
         </li>
       ))}
