@@ -1,4 +1,9 @@
-# Last Dance — project context
+# Nash — project context
+
+Named for the **Nash equilibrium**: no player can improve the split by
+unilaterally switching teams. That is the balancer's stopping condition, not a
+metaphor — it hill-climbs swaps until none of them help. Steve Nash is the
+second half of the joke.
 
 A pickup teams app for one friend group. Store the roster once, tap who showed
 up, get balanced teams. Built to kill the redundancy of re-describing fifteen
@@ -15,7 +20,7 @@ config entry, not a new app.
 | | |
 |---|---|
 | Framework | Next.js 16 (App Router, Turbopack), React 19 |
-| Styling | Tailwind v4, single light theme |
+| Styling | Tailwind v4, single dark theme (NBA 2K-inspired) |
 | Database | Neon Postgres via Vercel Marketplace |
 | ORM | Drizzle |
 | Drag & drop | `@dnd-kit/core` |
@@ -168,11 +173,16 @@ colour, and the bar underneath names the team outright.
 **Placement rules:**
 - Stated position first; leftovers fill open spots
 - A **height-settling pass** stops a 5'5" guard landing at centre, with a **3"
-  tolerance** so near-matches keep their real position (the game is positionless;
-  only egregious placements get corrected)
-- **A drag pins the player.** Pinned players claim their spot before automatic
-  placement runs and settling skips them — a drag is an instruction, not a
-  suggestion. Pins clear on regenerate.
+  tolerance**. It only ever moves a player *it* placed — someone standing at the
+  position he asked for is left alone. Settling everyone was what made a stated
+  point guard, being the tallest man there, get dragged to power forward on
+  every render.
+- **A drag pins the player to that spot**, and sends whoever was there back to
+  the spot he came from. One drag moves exactly two people, position is never
+  consulted, and nothing else on the board re-derives — a guard can be put at
+  centre to see him handle a big, which is the point of dragging. Pins record
+  the *spot*, not the position, so several spots can share one position and a
+  drag never rewrites roster data. Pins clear on regenerate.
 
 ### Winner stays on
 
@@ -200,8 +210,10 @@ Vercel before deploying.**
 - Drag between teams or to the bench, with live spread
 - Pairing rules (keep two together / apart)
 - Share links — short id, snapshot of the teams
-- Light theme; each sport declares one accent colour and the lighter/darker
-  shades derive from it
+- Dark arena theme after NBA 2K — near-black ground, crimson accent, brushed
+  steel on the wordmark, 2K's green-to-red tiers on every rating. Each sport
+  still declares one accent colour and the rest derive from it, but on a dark
+  ground they mix toward the page rather than toward white
 - Responsive: two-pane on laptop, stacked on phone
 
 ---
@@ -292,7 +304,8 @@ Not done, and deliberately so. Before deploying:
 - **The scale can't create separation.** Gaps come from ratings, not from range.
 - **Position is a preference, not a rule.** The game is positionless; the app only
   intervenes on placements anyone would object to.
-- **A drag always wins** over automatic placement.
+- **A drag always wins** over automatic placement, and is never blocked by
+  position — experimenting with mismatches is a feature, not a mistake.
 - **Challengers aren't balanced** against the team holding the court. That's street
   rules, and it was a deliberate choice.
 - **Height lives on the person**, not the sport profile, so it carries across sports.

@@ -9,8 +9,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Last Dance",
-  description: "Store the roster once. Pick who showed up. Get balanced teams.",
+  title: "Nash",
+  description:
+    "Store the roster once. Pick who showed up. Get teams no swap can improve.",
 };
 
 export const viewport: Viewport = {

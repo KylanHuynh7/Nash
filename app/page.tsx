@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-5 py-16 sm:max-w-2xl">
       <header className="space-y-3">
-        <h1 className="metal text-5xl leading-none">Last Dance</h1>
+        <h1 className="metal text-6xl leading-none">Nash</h1>
         <p className="text-[15px] leading-relaxed text-muted">
           The roster lives here. Tap who showed up, get teams that are actually
           even. No re-explaining everybody every single time.

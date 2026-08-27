@@ -1,7 +1,13 @@
-# Last Dance
+# Nash
 
 Pickup teams without re-prompting a chatbot every week. The roster is stored once;
 each session you tap who showed up and get balanced teams.
+
+Named for the **Nash equilibrium** — the state where no player improves the
+outcome by unilaterally switching sides. That is literally the balancer's exit
+condition: it swaps players between teams until no single swap makes the split
+better, then stops. It is also a point guard whose whole game was making the
+people around him even.
 
 ## How it works
 
