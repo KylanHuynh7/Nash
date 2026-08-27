@@ -86,17 +86,20 @@ export default function SportApp({
           "--accent-strong": `color-mix(in srgb, ${config.accent} 72%, white)`,
           "--accent-wash": `color-mix(in srgb, ${config.accent} 15%, #0e1014)`,
           "--accent-line": `color-mix(in srgb, ${config.accent} 42%, #0e1014)`,
-          // A sport owns its whole chrome, not just its highlights: every
-          // surface is a tint of its accent over near-black. That is what keeps
-          // red-and-black to basketball while Nash itself stays navy.
-          "--background": `color-mix(in srgb, ${config.accent} 12%, #08080a)`,
-          "--surface": `color-mix(in srgb, ${config.accent} 17%, #0e0e11)`,
-          "--surface-sunken": `color-mix(in srgb, ${config.accent} 13%, #0a0a0d)`,
-          "--surface-raised": `color-mix(in srgb, ${config.accent} 23%, #14141a)`,
-          "--border": `color-mix(in srgb, ${config.accent} 29%, #1c1c24)`,
-          "--border-strong": `color-mix(in srgb, ${config.accent} 41%, #2a2a34)`,
-          "--foreground": `color-mix(in srgb, ${config.accent} 6%, #ffffff)`,
-          "--muted": `color-mix(in srgb, ${config.accent} 20%, #a2a8bb)`,
+          // A sport owns its whole chrome, not just its highlights. The accent
+          // is a *hint* in the surfaces rather than a wash, though: tinting
+          // every panel heavily left the ground and the cards at the same
+          // value, so nothing read as a card. Panels step up in brightness,
+          // and the red goes where it means something — header, active tab,
+          // primary button, deltas.
+          "--background": `color-mix(in srgb, ${config.accent} 7%, #07070a)`,
+          "--surface": `color-mix(in srgb, ${config.accent} 9%, #191920)`,
+          "--surface-sunken": `color-mix(in srgb, ${config.accent} 7%, #101014)`,
+          "--surface-raised": `color-mix(in srgb, ${config.accent} 12%, #24242e)`,
+          "--border": `color-mix(in srgb, ${config.accent} 24%, #33333f)`,
+          "--border-strong": `color-mix(in srgb, ${config.accent} 36%, #4a4a59)`,
+          "--foreground": `color-mix(in srgb, ${config.accent} 4%, #ffffff)`,
+          "--muted": `color-mix(in srgb, ${config.accent} 12%, #adb3c4)`,
         } as React.CSSProperties
       }
     >
@@ -109,7 +112,10 @@ export default function SportApp({
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
-          background: `radial-gradient(75rem 38rem at 10% -8rem, color-mix(in srgb, ${config.accent} 55%, transparent), transparent), radial-gradient(60rem 34rem at 95% 0%, color-mix(in srgb, ${config.accent} 30%, transparent), transparent), radial-gradient(90rem 40rem at 50% 108%, color-mix(in srgb, ${config.accent} 20%, transparent), transparent), color-mix(in srgb, ${config.accent} 12%, #08080a)`,
+          // Contained to the top, like a light over the near end of the court,
+          // rather than a wash across the whole page. Below the fold it is
+          // simply dark, which is what gives the panels something to sit on.
+          background: `linear-gradient(180deg, color-mix(in srgb, ${config.accent} 62%, transparent) 0%, color-mix(in srgb, ${config.accent} 24%, transparent) 18%, transparent 46%), radial-gradient(70rem 26rem at 78% -6rem, color-mix(in srgb, ${config.accent} 34%, transparent), transparent), color-mix(in srgb, ${config.accent} 7%, #07070a)`,
         }}
       />
 

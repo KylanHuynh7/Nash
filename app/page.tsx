@@ -10,26 +10,41 @@ export default function Home() {
        * instead of being the thing.
        */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        {/*
+         * A directional sweep rather than a centred radial: a circle of red on
+         * black reads as a spotlight blob, where a diagonal falloff reads as a
+         * lit surface. Red owns the top-left two thirds and black is only ever
+         * the far corner.
+         */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(34rem 24rem at 42% 34%, #ff2440 0%, #d50a0a 30%, rgba(150,10,30,0.5) 52%, rgba(60,10,30,0.18) 70%, transparent 82%)",
+              "linear-gradient(128deg, #ff2c3f 0%, #e8102a 18%, #b90d22 34%, #7a0d1e 50%, #3d0a15 66%, #14070c 82%, #07070b 100%)",
           }}
         />
-        {/* A breath of league blue so the palette is three colours, not two. */}
+        {/* Light source, top-left, so the sweep has somewhere to come from. */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(38rem 26rem at 82% 88%, rgba(45,90,220,0.4) 0%, transparent 62%)",
+              "radial-gradient(60rem 44rem at 16% 6%, rgba(255,120,120,0.42) 0%, rgba(255,60,70,0.14) 34%, transparent 64%)",
           }}
         />
+        {/* League blue, kept to the shadow where it deepens rather than tints. */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(105% 90% at 42% 36%, transparent 18%, rgba(4,5,10,0.68) 58%, #04050a 86%)",
+              "radial-gradient(52rem 40rem at 96% 96%, rgba(38,74,200,0.5) 0%, rgba(20,40,120,0.18) 40%, transparent 70%)",
+          }}
+        />
+        {/* Corner vignette only — the frame, not the field. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(140% 120% at 40% 30%, transparent 52%, rgba(4,5,10,0.55) 84%, rgba(4,5,10,0.8) 100%)",
           }}
         />
       </div>
@@ -40,16 +55,11 @@ export default function Home() {
             <h1 className="text-7xl font-extrabold uppercase leading-none tracking-[-0.04em] text-white [text-shadow:0_2px_34px_rgba(0,0,0,0.5)]">
               Nash
             </h1>
-            {/* Shield underline. On a red ground the red segment only survives
-                against the dark rail behind it. */}
+            {/* One white rule. Three colours side by side read as a flag. */}
             <span
               aria-hidden
-              className="mt-3 flex h-1.5 w-44 overflow-hidden rounded-full bg-black/45 ring-1 ring-black/40"
-            >
-              <span className="h-full flex-1 bg-[#ff2e40]" />
-              <span className="h-full flex-1 bg-white" />
-              <span className="h-full flex-1 bg-[#4d7dff]" />
-            </span>
+              className="mt-4 block h-1 w-24 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.55)]"
+            />
           </div>
 
           <p className="max-w-md text-[15px] leading-relaxed text-white/85">

@@ -305,7 +305,7 @@ export default function RunTab({
                   className={`flex items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-1.5 text-sm transition ${
                     on
                       ? "border-accent-line bg-surface text-foreground shadow-[var(--shadow-card)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-raised)]"
-                      : "border-line bg-transparent text-muted opacity-70 hover:opacity-100"
+                      : "border-line-strong bg-sunken text-muted hover:border-accent-line hover:text-foreground"
                   }`}
                 >
                   <span
