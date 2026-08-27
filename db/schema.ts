@@ -13,6 +13,8 @@ import {
 export const players = pgTable("players", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  /** Approximate height in inches. Sport-independent, so it carries across. */
+  heightInches: integer("height_inches"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

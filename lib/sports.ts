@@ -177,3 +177,9 @@ export function defaultRatings(sport: SportConfig): Record<string, number> {
     sport.attributes.map((a) => [a.key, RATING_DEFAULT]),
   );
 }
+
+/** 71 -> 5'11". Null when a height hasn't been recorded. */
+export function formatHeight(inches: number | null | undefined): string | null {
+  if (typeof inches !== "number" || !Number.isFinite(inches)) return null;
+  return `${Math.floor(inches / 12)}'${inches % 12}"`;
+}

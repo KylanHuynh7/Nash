@@ -16,6 +16,7 @@ import type { BalancePlayer } from "@/lib/balance";
 
 export type RosterEntry = BalancePlayer & {
   ratings: Record<string, number>;
+  heightInches: number | null;
 };
 
 export async function getRoster(sport: SportId): Promise<RosterEntry[]> {
@@ -24,6 +25,7 @@ export async function getRoster(sport: SportId): Promise<RosterEntry[]> {
     .select({
       id: players.id,
       name: players.name,
+      heightInches: players.heightInches,
       position: profiles.position,
       ratings: profiles.ratings,
       overall: profiles.overall,
@@ -36,7 +38,10 @@ export async function getRoster(sport: SportId): Promise<RosterEntry[]> {
   return rows;
 }
 
-function clean(sport: SportId, raw: Record<string, unknown>): Record<string, number> {
+function clean(
+  sport: SportId,
+  raw: Record<string, unknown>,
+): Record<string, number> {
   const config = SPORTS[sport];
   const out: Record<string, number> = {};
   for (const attr of config.attributes) {
@@ -54,6 +59,7 @@ export type SavePlayerInput = {
   sport: string;
   position: string;
   ratings: Record<string, number>;
+  heightInches?: number | null;
 };
 
 export async function savePlayer(input: SavePlayerInput) {
@@ -72,11 +78,24 @@ export async function savePlayer(input: SavePlayerInput) {
 
   const db = getDb();
 
+  // 4'0"-7'6" keeps a typo from turning into a nonsense roster entry.
+  const rawHeight = input.heightInches;
+  const heightInches =
+    typeof rawHeight === "number" && Number.isFinite(rawHeight)
+      ? Math.min(90, Math.max(48, Math.round(rawHeight)))
+      : null;
+
   let playerId = input.playerId;
   if (playerId) {
-    await db.update(players).set({ name }).where(eq(players.id, playerId));
+    await db
+      .update(players)
+      .set({ name, heightInches })
+      .where(eq(players.id, playerId));
   } else {
-    const [created] = await db.insert(players).values({ name }).returning({ id: players.id });
+    const [created] = await db
+      .insert(players)
+      .values({ name, heightInches })
+      .returning({ id: players.id });
     playerId = created.id;
   }
 
@@ -97,7 +116,9 @@ export async function removePlayer(playerId: string, sport: string) {
   if (!isSportId(sport)) throw new Error(`Unknown sport: ${sport}`);
   const db = getDb();
 
-  await db.delete(profiles).where(and(eq(profiles.playerId, playerId), eq(profiles.sport, sport)));
+  await db
+    .delete(profiles)
+    .where(and(eq(profiles.playerId, playerId), eq(profiles.sport, sport)));
 
   const remaining = await db
     .select({ id: profiles.id })

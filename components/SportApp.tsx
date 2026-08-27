@@ -6,7 +6,7 @@ import { removePlayer, savePlayer, type RosterEntry } from "@/app/actions";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
 import { Button, EmptyState, Rating } from "@/components/ui";
-import { computeOverall, type SportConfig } from "@/lib/sports";
+import { computeOverall, formatHeight, type SportConfig } from "@/lib/sports";
 
 type Tab = "run" | "roster";
 
@@ -27,6 +27,7 @@ export default function SportApp({
     name: string;
     position: string;
     ratings: Record<string, number>;
+    heightInches: number | null;
   }) {
     startTransition(async () => {
       const { playerId } = await savePlayer({ ...input, sport: config.id });
@@ -35,6 +36,7 @@ export default function SportApp({
         name: input.name.trim(),
         position: input.position,
         ratings: input.ratings,
+        heightInches: input.heightInches,
         overall: computeOverall(config, input.ratings),
       };
       setRoster((prev) => {
@@ -172,6 +174,9 @@ function RosterList({
               <span className="block truncate font-medium">{p.name}</span>
               <span className="block text-xs text-muted">
                 {positions.get(p.position)?.full ?? p.position}
+                {formatHeight(p.heightInches) && (
+                  <> · {formatHeight(p.heightInches)}</>
+                )}
               </span>
             </span>
             <span aria-hidden className="text-muted">

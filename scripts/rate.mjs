@@ -14,9 +14,19 @@ const sql = neon(process.env.DATABASE_URL);
 const KEYS = ["shooting", "finishing", "playmaking", "defense", "rebounding", "athleticism"];
 const WEIGHTS = { shooting: 1.15, finishing: 1.1, playmaking: 1.05, defense: 1.1, rebounding: 0.85, athleticism: 0.95 };
 
-const [name, position, ...values] = process.argv.slice(2);
+const [name, position, ...rest] = process.argv.slice(2);
+// Optional trailing height as 5'11" or 71.
+let height = null;
+if (rest.length > KEYS.length) {
+  const raw = rest.pop();
+  const feetInches = /^(\d)'(\d{1,2})"?$/.exec(raw);
+  height = feetInches
+    ? Number(feetInches[1]) * 12 + Number(feetInches[2])
+    : Number(raw);
+}
+const values = rest;
 if (!name || !position || values.length !== KEYS.length) {
-  console.error(`usage: rate.mjs <name> <guard|wing|big> ${KEYS.map((k) => `<${k}>`).join(" ")}`);
+  console.error(`usage: rate.mjs <name> <guard|wing|big> ${KEYS.map((k) => `<${k}>`).join(" ")} [height]`);
   process.exit(1);
 }
 
@@ -41,5 +51,10 @@ await sql`
    where player_id = ${player.id} and sport = 'basketball'
 `;
 
-console.log(`${name} → ${position}, overall ${overall}`);
+if (height !== null && Number.isFinite(height)) {
+  await sql`update players set height_inches = ${height} where id = ${player.id}`;
+}
+
+const shown = height ? ` ${Math.floor(height / 12)}'${height % 12}"` : "";
+console.log(`${name} → ${position}${shown}, overall ${overall}`);
 console.log("  " + KEYS.map((k) => `${k} ${ratings[k]}`).join("  "));

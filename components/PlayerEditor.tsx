@@ -31,6 +31,7 @@ export default function PlayerEditor({
     name: string;
     position: string;
     ratings: Record<string, number>;
+    heightInches: number | null;
   }) => void;
   onDelete?: (playerId: string) => void;
   busy: boolean;
@@ -42,6 +43,14 @@ export default function PlayerEditor({
   );
   const [ratings, setRatings] = useState<Record<string, number>>(
     existing?.ratings ?? defaultRatings(config),
+  );
+  const [feet, setFeet] = useState(() =>
+    existing?.heightInches
+      ? String(Math.floor(existing.heightInches / 12))
+      : "",
+  );
+  const [inches, setInches] = useState(() =>
+    existing?.heightInches ? String(existing.heightInches % 12) : "",
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -89,18 +98,54 @@ export default function PlayerEditor({
         </div>
 
         <div className="sm:grid sm:grid-cols-2 sm:gap-x-7">
-          <label className="mt-5 block">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
-              Name
-            </span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Who is it?"
-              autoFocus={!existing}
-              className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/15"
-            />
-          </label>
+          <div className="mt-5 flex gap-3">
+            <label className="min-w-0 flex-1">
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+                Name
+              </span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Who is it?"
+                autoFocus={!existing}
+                className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
+
+            <fieldset className="shrink-0">
+              <legend className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+                Height
+              </legend>
+              <div className="flex items-center gap-1">
+                <input
+                  value={feet}
+                  onChange={(e) =>
+                    setFeet(e.target.value.replace(/\D/g, "").slice(0, 1))
+                  }
+                  inputMode="numeric"
+                  placeholder="5"
+                  aria-label="Feet"
+                  className="w-11 rounded-xl border border-line bg-surface px-2 py-3 text-center text-base outline-none placeholder:text-muted/60 focus:border-accent"
+                />
+                <span aria-hidden className="text-muted">
+                  &apos;
+                </span>
+                <input
+                  value={inches}
+                  onChange={(e) =>
+                    setInches(e.target.value.replace(/\D/g, "").slice(0, 2))
+                  }
+                  inputMode="numeric"
+                  placeholder="11"
+                  aria-label="Inches"
+                  className="w-12 rounded-xl border border-line bg-surface px-2 py-3 text-center text-base outline-none placeholder:text-muted/60 focus:border-accent"
+                />
+                <span aria-hidden className="text-muted">
+                  &quot;
+                </span>
+              </div>
+            </fieldset>
+          </div>
 
           <fieldset className="mt-5">
             <legend className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted">
@@ -203,7 +248,16 @@ export default function PlayerEditor({
           </Button>
           <Button
             onClick={() =>
-              onSave({ playerId: existing?.id, name, position, ratings })
+              onSave({
+                playerId: existing?.id,
+                name,
+                position,
+                ratings,
+                heightInches:
+                  feet === ""
+                    ? null
+                    : Number(feet) * 12 + (inches === "" ? 0 : Number(inches)),
+              })
             }
             disabled={!name.trim() || busy}
             className="flex-[2]"
