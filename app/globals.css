@@ -7,20 +7,22 @@
  * dark ground a shadow does nothing, so elevation has to be carried by value.
  */
 :root {
-  --background: #08090c;
-  --surface: #15181f;
-  --surface-sunken: #0e1014;
-  --surface-raised: #1d212a;
-  --border: #272c37;
-  --border-strong: #3d4453;
-  --foreground: #f3f5f9;
-  --muted: #949cb0;
+  /* Nash's own colours: the navy-white-red a league shield is built from. Each
+     sport replaces this whole ladder with a tint of its own accent, so red and
+     black belong to basketball rather than to the app. */
+  --background: #060d24;
+  --surface: #111d47;
+  --surface-sunken: #0a1332;
+  --surface-raised: #1a2a60;
+  --border: #23366f;
+  --border-strong: #37509b;
+  --foreground: #f7f9ff;
+  --muted: #9fb0dc;
 
-  /* 2K red. Each sport still overrides this with its own. */
-  --accent: #e01e37;
-  --accent-strong: #ff4056;
-  --accent-wash: #2a1219;
-  --accent-line: #6b1f2c;
+  --accent: #d50a0a;
+  --accent-strong: #ff2e2e;
+  --accent-wash: #2b0d18;
+  --accent-line: #6d1526;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
   --shadow-raised: 0 4px 10px rgb(0 0 0 / 0.5), 0 14px 32px rgb(0 0 0 / 0.45);
@@ -49,8 +51,9 @@ body {
   /* Court-light spill: a hot wash of the sport's colour up top, falling off
      into black, so the page reads as an arena rather than a dark rectangle. */
   background:
-    radial-gradient(70rem 34rem at 12% -10rem, color-mix(in srgb, var(--accent) 34%, transparent), transparent),
-    radial-gradient(56rem 30rem at 94% -4rem, color-mix(in srgb, var(--accent) 16%, transparent), transparent),
+    radial-gradient(75rem 38rem at 10% -8rem, color-mix(in srgb, var(--accent) 55%, transparent), transparent),
+    radial-gradient(60rem 34rem at 95% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent),
+    radial-gradient(90rem 40rem at 50% 108%, color-mix(in srgb, var(--accent) 20%, transparent), transparent),
     var(--background);
   background-attachment: fixed;
   color: var(--foreground);

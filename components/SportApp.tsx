@@ -86,9 +86,33 @@ export default function SportApp({
           "--accent-strong": `color-mix(in srgb, ${config.accent} 72%, white)`,
           "--accent-wash": `color-mix(in srgb, ${config.accent} 15%, #0e1014)`,
           "--accent-line": `color-mix(in srgb, ${config.accent} 42%, #0e1014)`,
+          // A sport owns its whole chrome, not just its highlights: every
+          // surface is a tint of its accent over near-black. That is what keeps
+          // red-and-black to basketball while Nash itself stays navy.
+          "--background": `color-mix(in srgb, ${config.accent} 12%, #08080a)`,
+          "--surface": `color-mix(in srgb, ${config.accent} 17%, #0e0e11)`,
+          "--surface-sunken": `color-mix(in srgb, ${config.accent} 13%, #0a0a0d)`,
+          "--surface-raised": `color-mix(in srgb, ${config.accent} 23%, #14141a)`,
+          "--border": `color-mix(in srgb, ${config.accent} 29%, #1c1c24)`,
+          "--border-strong": `color-mix(in srgb, ${config.accent} 41%, #2a2a34)`,
+          "--foreground": `color-mix(in srgb, ${config.accent} 6%, #ffffff)`,
+          "--muted": `color-mix(in srgb, ${config.accent} 20%, #a2a8bb)`,
         } as React.CSSProperties
       }
     >
+      {/*
+       * body paints its gradient from :root, which is Nash's red — so without
+       * this the football page would still sit on a red ground. The sport owns
+       * the whole viewport, not just the elements inside it.
+       */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background: `radial-gradient(75rem 38rem at 10% -8rem, color-mix(in srgb, ${config.accent} 55%, transparent), transparent), radial-gradient(60rem 34rem at 95% 0%, color-mix(in srgb, ${config.accent} 30%, transparent), transparent), radial-gradient(90rem 40rem at 50% 108%, color-mix(in srgb, ${config.accent} 20%, transparent), transparent), color-mix(in srgb, ${config.accent} 12%, #08080a)`,
+        }}
+      />
+
       <header className="mb-5 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Link
