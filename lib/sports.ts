@@ -35,8 +35,22 @@ export type SportConfig = {
   comingSoon?: boolean;
   /** What the playing surface is called — 'court', 'field'. */
   surface: string;
-  /** Where each lineup spot sits on the playing surface, as percentages. */
-  spots: { key: string; label: string; full: string; x: number; y: number }[];
+  /**
+   * Where each lineup spot sits on the playing surface, as percentages.
+   *
+   * `position` is the roster position that claims the spot, for sports where
+   * several spots take the same one — three receivers line up in different
+   * places but they are all WR. It defaults to the spot's own key, which is
+   * why basketball never states it.
+   */
+  spots: {
+    key: string;
+    label: string;
+    full: string;
+    x: number;
+    y: number;
+    position?: string;
+  }[];
   /**
    * Spots ordered by the physical presence they call for, biggest first. Used
    * only to place players who didn't get their own position.
@@ -160,16 +174,20 @@ export const SPORTS: Record<SportId, SportConfig> = {
         weight: 0.7,
       },
     ],
+    // There is no run game and no designated rusher. The slot is the closest
+    // thing to a back — short routes run as if he came out of the backfield —
+    // which makes it a role of its own rather than a third receiver.
     positions: [
       { key: "qb", label: "QB", full: "Quarterback" },
       { key: "te", label: "TE", full: "Tight End" },
       { key: "wr", label: "WR", full: "Receiver" },
-      { key: "rush", label: "RUSH", full: "Rusher" },
+      { key: "slot", label: "SLOT", full: "Slot" },
     ],
-    // Four receivers and a quarterback — there's no line to draw.
+    // Four receivers and a quarterback — there's no line to draw. The two
+    // outside spots share the WR position, so each names it.
     spots: [
-      { key: "wr_l", label: "WR", full: "Wide left", x: 30, y: 17 },
-      { key: "wr_r", label: "WR", full: "Wide right", x: 70, y: 17 },
+      { key: "wr_l", label: "WR", full: "Wide left", x: 30, y: 17, position: "wr" },
+      { key: "wr_r", label: "WR", full: "Wide right", x: 70, y: 17, position: "wr" },
       { key: "te", label: "TE", full: "Tight end", x: 23, y: 53 },
       { key: "slot", label: "SLOT", full: "Slot", x: 77, y: 53 },
       { key: "qb", label: "QB", full: "Quarterback", x: 50, y: 80 },

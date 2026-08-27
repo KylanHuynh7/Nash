@@ -24,10 +24,15 @@ export type Board = {
   teams: BalancePlayer[][];
   bench: BalancePlayer[];
   /**
-   * Players whose spot was chosen by hand. Automatic placement never moves
-   * them again — a drag is an instruction, not a suggestion.
+   * Player id -> the id of the spot they were dropped on. Automatic placement
+   * never moves them again — a drag is an instruction, not a suggestion.
+   *
+   * The spot is recorded rather than the position, because several spots can
+   * share one position: dropping a receiver on the right side has to keep him
+   * on the right side, and rewriting his position to the spot key would put a
+   * "wr_l" into a saved run where a real position belongs.
    */
-  pinned: string[];
+  pinned: Record<string, string>;
 };
 
 const BENCH = "bench";
@@ -75,20 +80,48 @@ function move(board: Board, playerId: string, to: string): Board {
     );
   }
 
-  return { teams, bench, pinned: board.pinned.filter((id) => id !== playerId) };
+  // Changing team drops the pin: the spot it referred to was on the old side.
+  const pinned = Object.fromEntries(
+    Object.entries(board.pinned).filter(([id]) => id !== playerId),
+  );
+  return { teams, bench, pinned };
 }
 
-/** Re-labels a player's position, leaving their team membership alone. */
-function reposition(board: Board, playerId: string, position: string): Board {
-  const apply = (list: BalancePlayer[]) =>
-    list.map((p) => (p.id === playerId ? { ...p, position } : p));
-  return {
-    teams: board.teams.map(apply),
-    bench: apply(board.bench),
-    pinned: board.pinned.includes(playerId)
-      ? board.pinned
-      : [...board.pinned, playerId],
-  };
+/**
+ * Puts a player on the spot they were dropped on and sends whoever was there
+ * back to the spot they came from — a straight swap of two players.
+ *
+ * Position is not consulted and cannot block the move: putting a guard at
+ * centre to see him handle a big is the point of dragging, not a mistake to
+ * correct. Both ends of the swap get pinned, so automatic placement and the
+ * height pass leave the whole board alone afterwards and one drag moves
+ * exactly two people.
+ */
+function pinToSpot(
+  board: Board,
+  config: SportConfig,
+  playerId: string,
+  spot: string,
+): Board {
+  const teamIndex = board.teams.findIndex((t) =>
+    t.some((p) => p.id === playerId),
+  );
+  // Dropping a benched player onto a spot says nothing about which side he's
+  // joining, so it isn't a move we can make sense of.
+  if (teamIndex === -1) return board;
+
+  const matchups = buildMatchups(config, board.teams, board.pinned);
+  const from = matchups.find((m) => m.players[teamIndex]?.id === playerId);
+  if (!from || from.position === spot) return board;
+
+  const target = matchups.find((m) => m.position === spot);
+  if (!target) return board;
+
+  const pinned = { ...board.pinned, [playerId]: spot };
+  const displaced = target.players[teamIndex];
+  if (displaced) pinned[displaced.id] = from.position;
+
+  return { ...board, pinned };
 }
 
 export default function TeamBoard({
@@ -130,11 +163,10 @@ export default function TeamBoard({
     const over = event.over?.id;
     if (typeof over !== "string" || !dropped) return;
 
-    // On the court, dropping onto a spot swaps within the position rather than
-    // changing teams — the spot belongs to both sides at once.
+    // On the court, dropping onto a spot rearranges that team's own lineup
+    // rather than changing teams — the spot belongs to both sides at once.
     if (over.startsWith("spot-")) {
-      const position = over.slice("spot-".length);
-      onChange(reposition(board, dropped.id, position));
+      onChange(pinToSpot(board, config, dropped.id, over.slice("spot-".length)));
       return;
     }
 
@@ -246,7 +278,7 @@ function Column({
         ) : (
           <div className="flex items-center gap-2 text-xs text-muted">
             <span
-              className={`font-mono tabular-nums ${flagSize ? "font-semibold text-amber-600" : ""}`}
+              className={`font-mono tabular-nums ${flagSize ? "font-semibold text-amber-400" : ""}`}
             >
               {players.length} · avg {average}
             </span>
