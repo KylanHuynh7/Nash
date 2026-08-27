@@ -16,7 +16,8 @@ import {
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { Rating, teamColor } from "@/components/ui";
-import CourtView, { buildMatchups } from "@/components/CourtView";
+import CourtView from "@/components/CourtView";
+import { buildMatchups } from "@/lib/lineup";
 import type { SportConfig } from "@/lib/sports";
 import type { BalancePlayer } from "@/lib/balance";
 

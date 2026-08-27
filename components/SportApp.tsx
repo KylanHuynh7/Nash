@@ -8,7 +8,12 @@ import PlayerCard from "@/components/PlayerCard";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
 import { Button, EmptyState, Rating } from "@/components/ui";
-import { computeOverall, formatHeight, type SportConfig } from "@/lib/sports";
+import {
+  computeOverall,
+  formatHeight,
+  sportChrome,
+  type SportConfig,
+} from "@/lib/sports";
 
 type Tab = "run" | "roster";
 
@@ -76,32 +81,7 @@ export default function SportApp({
   return (
     <div
       className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6 lg:max-w-6xl lg:px-8 lg:pt-10"
-      style={
-        {
-          // The lighter and darker accents are derived so a sport only ever
-          // declares one colour.
-          "--accent": config.accent,
-          // On a dark ground the derived shades mix toward the page, not
-          // toward white: a hover that brightens, a wash that stays black.
-          "--accent-strong": `color-mix(in srgb, ${config.accent} 72%, white)`,
-          "--accent-wash": `color-mix(in srgb, ${config.accent} 15%, #0e1014)`,
-          "--accent-line": `color-mix(in srgb, ${config.accent} 42%, #0e1014)`,
-          // A sport owns its whole chrome, not just its highlights. The accent
-          // is a *hint* in the surfaces rather than a wash, though: tinting
-          // every panel heavily left the ground and the cards at the same
-          // value, so nothing read as a card. Panels step up in brightness,
-          // and the red goes where it means something — header, active tab,
-          // primary button, deltas.
-          "--background": `color-mix(in srgb, ${config.accent} 7%, #07070a)`,
-          "--surface": `color-mix(in srgb, ${config.accent} 9%, #191920)`,
-          "--surface-sunken": `color-mix(in srgb, ${config.accent} 7%, #101014)`,
-          "--surface-raised": `color-mix(in srgb, ${config.accent} 12%, #24242e)`,
-          "--border": `color-mix(in srgb, ${config.accent} 24%, #33333f)`,
-          "--border-strong": `color-mix(in srgb, ${config.accent} 36%, #4a4a59)`,
-          "--foreground": `color-mix(in srgb, ${config.accent} 4%, #ffffff)`,
-          "--muted": `color-mix(in srgb, ${config.accent} 12%, #adb3c4)`,
-        } as React.CSSProperties
-      }
+      style={sportChrome(config) as React.CSSProperties}
     >
       {/*
        * body paints its gradient from :root, which is Nash's red — so without
@@ -111,12 +91,7 @@ export default function SportApp({
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-10"
-        style={{
-          // Contained to the top, like a light over the near end of the court,
-          // rather than a wash across the whole page. Below the fold it is
-          // simply dark, which is what gives the panels something to sit on.
-          background: `linear-gradient(180deg, color-mix(in srgb, ${config.accent} 62%, transparent) 0%, color-mix(in srgb, ${config.accent} 24%, transparent) 18%, transparent 46%), radial-gradient(70rem 26rem at 78% -6rem, color-mix(in srgb, ${config.accent} 34%, transparent), transparent), color-mix(in srgb, ${config.accent} 7%, #07070a)`,
-        }}
+        style={{ background: sportChrome(config)["--page-background"] }}
       />
 
       <header className="mb-5 flex items-center justify-between gap-3">

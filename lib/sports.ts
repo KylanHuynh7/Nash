@@ -202,6 +202,45 @@ export function isSportId(value: string): value is SportId {
   return value === "basketball" || value === "football";
 }
 
+/**
+ * Every CSS variable a sport's chrome is built from, derived from its one
+ * declared accent. Shared by the sport page and the share page so a link out of
+ * basketball still looks like basketball.
+ *
+ * The accent is only a hint in the surfaces: tinting panels heavily leaves them
+ * at the same value as the ground and nothing reads as a card. Panels step up
+ * in brightness instead, and the accent goes where it means something.
+ *
+ * Returned as plain strings rather than CSSProperties so this module stays
+ * free of React types — the rating scripts import it under plain node.
+ */
+export function sportChrome(sport: SportConfig): Record<string, string> {
+  const a = sport.accent;
+  const mix = (pct: number, base: string) =>
+    `color-mix(in srgb, ${a} ${pct}%, ${base})`;
+  return {
+    "--accent": a,
+    "--accent-strong": mix(72, "white"),
+    "--accent-wash": mix(15, "#0e1014"),
+    "--accent-line": mix(42, "#0e1014"),
+    "--background": mix(7, "#07070a"),
+    "--surface": mix(9, "#191920"),
+    "--surface-sunken": mix(7, "#101014"),
+    "--surface-raised": mix(12, "#24242e"),
+    "--border": mix(24, "#33333f"),
+    "--border-strong": mix(36, "#4a4a59"),
+    "--foreground": mix(4, "#ffffff"),
+    "--muted": mix(12, "#adb3c4"),
+    // Contained to the top, like a light over the near end of the court,
+    // rather than a wash across the page. Below the fold it is simply dark.
+    "--page-background": [
+      `linear-gradient(180deg, ${mix(62, "transparent")} 0%, ${mix(24, "transparent")} 18%, transparent 46%)`,
+      `radial-gradient(70rem 26rem at 78% -6rem, ${mix(34, "transparent")}, transparent)`,
+      mix(7, "#07070a"),
+    ].join(", "),
+  };
+}
+
 export const RATING_MIN = 65;
 export const RATING_MAX = 99;
 export const RATING_DEFAULT = 80;
