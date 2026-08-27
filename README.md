@@ -1,4 +1,4 @@
-# Run It Back
+# Last Dance
 
 Pickup teams without re-prompting a chatbot every week. The roster is stored once;
 each session you tap who showed up and get balanced teams.

@@ -154,6 +154,7 @@ export default function TeamBoard({
         <CourtView
           matchups={buildMatchups(config, board.teams, board.pinned)}
           teamCount={board.teams.length}
+          config={config}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">

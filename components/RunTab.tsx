@@ -320,7 +320,7 @@ export default function RunTab({
           <section>
             <div className="mb-2.5 flex items-baseline justify-between">
               <h2 className="text-sm font-medium uppercase tracking-wider text-muted">
-                On the court
+                On the {config.surface}
               </h2>
               <div className="flex items-center gap-3 text-sm">
                 <span className="font-mono tabular-nums text-muted">
@@ -349,7 +349,7 @@ export default function RunTab({
             {onCourt.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line-strong bg-surface/50 px-3 py-3 text-center text-xs text-muted">
                 Pick who&apos;s playing this game, or auto-pick to give the
-                longest-waiting {courtCap} the floor.
+                longest-waiting {courtCap} the {config.surface}.
               </p>
             ) : null}
 
@@ -512,7 +512,7 @@ export default function RunTab({
                           : "text-muted hover:text-foreground"
                       }`}
                     >
-                      {mode}
+                      {mode === "court" ? config.surface : mode}
                     </button>
                   ))}
                 </div>
@@ -599,8 +599,8 @@ export default function RunTab({
                 })}
               </div>
               <p className="mt-2 px-0.5 text-center text-[11px] text-muted">
-                Winners hold the court. Losers go to the back of the line and
-                the longest waits come on.
+                Winners hold the {config.surface}. Losers go to the back of the
+                line and the longest waits come on.
               </p>
             </div>
 

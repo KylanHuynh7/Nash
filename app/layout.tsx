@@ -9,7 +9,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Run It Back",
+  title: "Last Dance",
   description: "Store the roster once. Pick who showed up. Get balanced teams.",
 };
 

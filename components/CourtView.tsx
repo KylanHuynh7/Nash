@@ -15,25 +15,6 @@ export type Matchup = {
 };
 
 /**
- * Half-court spots as percentages of the court box. Laid out the way you'd
- * look at a half court: bigs near the rim at the top, guards out front.
- */
-const SPOTS: Record<string, { x: number; y: number }> = {
-  c: { x: 30, y: 17 },
-  pf: { x: 70, y: 17 },
-  sf: { x: 23, y: 53 },
-  sg: { x: 77, y: 53 },
-  pg: { x: 50, y: 80 },
-};
-
-/**
- * Slots from biggest to smallest. Used only to place players who could not get
- * their own position, so the tallest spare ends up nearest the rim rather than
- * a 5'5" guard landing at centre.
- */
-const SIZE_ORDER = ["c", "pf", "sf", "sg", "pg"] as const;
-
-/**
  * Pairs each team's players by position. Anyone whose position is already
  * taken on their own team spills into the next open spot, so ten players
  * always land somewhere rather than silently vanishing.
@@ -44,11 +25,10 @@ export function buildMatchups(
   pinned: string[] = [],
 ): Matchup[] {
   const isPinned = new Set(pinned);
-  const order = config.positions.filter((p) => SPOTS[p.key]);
-  const slots: Matchup[] = order.map((p) => ({
-    position: p.key,
-    label: p.label,
-    full: p.full,
+  const slots: Matchup[] = config.spots.map((spot) => ({
+    position: spot.key,
+    label: spot.label,
+    full: spot.full,
     players: teams.map(() => null),
   }));
 
@@ -73,16 +53,18 @@ export function buildMatchups(
     const height = (p: BalancePlayer) => p.heightInches ?? 70;
     leftover.sort((a, b) => height(b) - height(a) || b.overall - a.overall);
 
-    const openBySize = SIZE_ORDER.map((key) =>
-      slots.find((s) => s.position === key && s.players[teamIndex] === null),
-    ).filter((s): s is Matchup => Boolean(s));
+    const openBySize = config.sizeOrder
+      .map((key) =>
+        slots.find((s) => s.position === key && s.players[teamIndex] === null),
+      )
+      .filter((s): s is Matchup => Boolean(s));
 
     leftover.forEach((player, i) => {
       const slot = openBySize[i];
       if (slot) slot.players[teamIndex] = player;
     });
 
-    settleByHeight(slots, teamIndex, isPinned);
+    settleByHeight(slots, config.sizeOrder, teamIndex, isPinned);
   });
 
   return slots;
@@ -101,12 +83,13 @@ const HEIGHT_TOLERANCE = 3;
 
 function settleByHeight(
   slots: Matchup[],
+  sizeOrder: string[],
   teamIndex: number,
   pinned: Set<string>,
 ) {
-  const bySize = SIZE_ORDER.map((key) =>
-    slots.find((s) => s.position === key),
-  ).filter((s): s is Matchup => Boolean(s));
+  const bySize = sizeOrder
+    .map((key) => slots.find((s) => s.position === key))
+    .filter((s): s is Matchup => Boolean(s));
 
   const height = (p: BalancePlayer | null) => p?.heightInches ?? 70;
 
@@ -133,16 +116,19 @@ function settleByHeight(
 export default function CourtView({
   matchups,
   teamCount,
+  config,
 }: {
   matchups: Matchup[];
   teamCount: number;
+  config: SportConfig;
 }) {
+  const spots = new Map(config.spots.map((s) => [s.key, s]));
   return (
     <div className="relative w-full overflow-hidden rounded-2xl border border-line bg-sunken shadow-[var(--shadow-card)]">
-      <CourtMarkings />
+      {config.id === "football" ? <FieldMarkings /> : <CourtMarkings />}
       <div className="relative aspect-[3/4] w-full sm:aspect-[5/4]">
         {matchups.map((m) => {
-          const spot = SPOTS[m.position];
+          const spot = spots.get(m.position);
           if (!spot) return null;
           return (
             <div
@@ -211,6 +197,89 @@ function CourtMarkings() {
         fill="none"
         stroke="currentColor"
         strokeWidth="0.5"
+      />
+    </svg>
+  );
+}
+
+/** Yard lines running away from a end zone, with the snap up front. */
+function FieldMarkings() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full text-line-strong"
+    >
+      <rect
+        x="1"
+        y="1"
+        width="98"
+        height="98"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.4"
+      />
+      {/* End zone across the top */}
+      <rect
+        x="1"
+        y="1"
+        width="98"
+        height="12"
+        fill="currentColor"
+        opacity="0.07"
+      />
+      <line
+        x1="1"
+        y1="13"
+        x2="99"
+        y2="13"
+        stroke="currentColor"
+        strokeWidth="0.6"
+      />
+      {/* Yard lines */}
+      {[26, 39, 52, 65].map((y) => (
+        <line
+          key={y}
+          x1="1"
+          y1={y}
+          x2="99"
+          y2={y}
+          stroke="currentColor"
+          strokeWidth="0.3"
+        />
+      ))}
+      {/* Hash marks down the middle */}
+      {[19.5, 32.5, 45.5, 58.5, 71.5].map((y) => (
+        <g key={y}>
+          <line
+            x1="33"
+            y1={y}
+            x2="36"
+            y2={y}
+            stroke="currentColor"
+            strokeWidth="0.3"
+          />
+          <line
+            x1="64"
+            y1={y}
+            x2="67"
+            y2={y}
+            stroke="currentColor"
+            strokeWidth="0.3"
+          />
+        </g>
+      ))}
+      {/* Line of scrimmage */}
+      <line
+        x1="1"
+        y1="71"
+        x2="99"
+        y2="71"
+        stroke="currentColor"
+        strokeWidth="0.7"
+        strokeDasharray="2 1.5"
       />
     </svg>
   );

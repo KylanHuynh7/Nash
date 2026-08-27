@@ -72,7 +72,16 @@ export default function SportApp({
   return (
     <div
       className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6 lg:max-w-6xl lg:px-8 lg:pt-10"
-      style={{ ["--accent" as string]: config.accent }}
+      style={
+        {
+          // The lighter and darker accents are derived so a sport only ever
+          // declares one colour.
+          "--accent": config.accent,
+          "--accent-strong": `color-mix(in srgb, ${config.accent} 82%, black)`,
+          "--accent-wash": `color-mix(in srgb, ${config.accent} 9%, white)`,
+          "--accent-line": `color-mix(in srgb, ${config.accent} 32%, white)`,
+        } as React.CSSProperties
+      }
     >
       <header className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

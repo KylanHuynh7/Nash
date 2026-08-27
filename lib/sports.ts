@@ -33,6 +33,15 @@ export type SportConfig = {
   criticalPosition?: string;
   /** Configured but not yet built out; hidden from navigation. */
   comingSoon?: boolean;
+  /** What the playing surface is called — 'court', 'field'. */
+  surface: string;
+  /** Where each lineup spot sits on the playing surface, as percentages. */
+  spots: { key: string; label: string; full: string; x: number; y: number }[];
+  /**
+   * Spots ordered by the physical presence they call for, biggest first. Used
+   * only to place players who didn't get their own position.
+   */
+  sizeOrder: string[];
   accent: string;
 };
 
@@ -44,6 +53,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     defaultTeams: 2,
     sideSize: 5,
     accent: "#4f46e5",
+    surface: "court",
     attributes: [
       // Weighted for full-court games to 11: you run the whole floor, boards
       // start breaks, and the man who can still go at 9-9 decides it.
@@ -91,6 +101,14 @@ export const SPORTS: Record<SportId, SportConfig> = {
       { key: "pf", label: "PF", full: "Power Forward" },
       { key: "c", label: "C", full: "Center" },
     ],
+    spots: [
+      { key: "c", label: "C", full: "Center", x: 30, y: 17 },
+      { key: "pf", label: "PF", full: "Power Forward", x: 70, y: 17 },
+      { key: "sf", label: "SF", full: "Small Forward", x: 23, y: 53 },
+      { key: "sg", label: "SG", full: "Shooting Guard", x: 77, y: 53 },
+      { key: "pg", label: "PG", full: "Point Guard", x: 50, y: 80 },
+    ],
+    sizeOrder: ["c", "pf", "sf", "sg", "pg"],
   },
   football: {
     id: "football",
@@ -99,8 +117,8 @@ export const SPORTS: Record<SportId, SportConfig> = {
     defaultTeams: 2,
     sideSize: 5,
     accent: "#0d9488",
+    surface: "field",
     criticalPosition: "qb",
-    comingSoon: true,
     attributes: [
       {
         key: "hands",
@@ -144,9 +162,19 @@ export const SPORTS: Record<SportId, SportConfig> = {
     ],
     positions: [
       { key: "qb", label: "QB", full: "Quarterback" },
-      { key: "receiver", label: "WR", full: "Receiver" },
-      { key: "rusher", label: "RSH", full: "Rusher" },
+      { key: "te", label: "TE", full: "Tight End" },
+      { key: "wr", label: "WR", full: "Receiver" },
+      { key: "rush", label: "RUSH", full: "Rusher" },
     ],
+    // Four receivers and a quarterback — there's no line to draw.
+    spots: [
+      { key: "wr_l", label: "WR", full: "Wide left", x: 30, y: 17 },
+      { key: "wr_r", label: "WR", full: "Wide right", x: 70, y: 17 },
+      { key: "te", label: "TE", full: "Tight end", x: 23, y: 53 },
+      { key: "slot", label: "SLOT", full: "Slot", x: 77, y: 53 },
+      { key: "qb", label: "QB", full: "Quarterback", x: 50, y: 80 },
+    ],
+    sizeOrder: ["te", "wr_l", "wr_r", "slot", "qb"],
   },
 };
 
