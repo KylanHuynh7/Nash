@@ -75,7 +75,7 @@ export default function PlayerEditor({
   const quickValue = allEqual ? values[0] : overall;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center">
       <div
         className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-line bg-surface p-5 pb-8 shadow-[var(--shadow-lift)] sm:max-w-2xl sm:rounded-3xl sm:p-6"
         role="dialog"
@@ -270,7 +270,7 @@ export default function PlayerEditor({
           <div className="mt-3">
             {confirmDelete ? (
               <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-2.5">
-                <span className="flex-1 pl-1 text-sm text-rose-700">
+                <span className="flex-1 pl-1 text-sm text-rose-300">
                   Remove {existing.name} from {config.label.toLowerCase()}?
                 </span>
                 <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
@@ -288,7 +288,7 @@ export default function PlayerEditor({
               <button
                 type="button"
                 onClick={() => setConfirmDelete(true)}
-                className="w-full py-2 text-sm text-muted transition hover:text-rose-600"
+                className="w-full py-2 text-sm text-muted transition hover:text-rose-400"
               >
                 Remove from roster
               </button>

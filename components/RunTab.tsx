@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { saveRun } from "@/app/actions";
-import { Button, EmptyState, teamColor } from "@/components/ui";
+import { Button, EmptyState, ratingTone, teamColor } from "@/components/ui";
 import TeamBoard, {
   boardSpread,
   teamAverage,
@@ -169,7 +169,7 @@ export default function RunTab({
     setBoard({
       teams: next.teams.map((t) => t.players),
       bench: benched,
-      pinned: [],
+      pinned: {},
     });
     setEdited(false);
     setSeed(nextSeed);
@@ -202,7 +202,7 @@ export default function RunTab({
     teams[winnerIndex] = winners;
     teams[1 - winnerIndex] = challengers;
 
-    setBoard({ teams, bench: waiting, pinned: [] });
+    setBoard({ teams, bench: waiting, pinned: {} });
     setSitting(roster.filter((p) => waiting.some((w) => w.id === p.id)));
     setPlaying(new Set([...winners, ...challengers].map((p) => p.id)));
 
@@ -298,15 +298,25 @@ export default function RunTab({
                   key={p.id}
                   onClick={() => togglePresent(p.id)}
                   aria-pressed={on}
-                  className={`flex items-center gap-2 rounded-full border py-2 pl-3 pr-2.5 text-sm transition ${
+                  // Attendance is a filter, not a selection: most people are
+                  // usually here, so the present look normal and the absent
+                  // recede. Painting every attendee accent-solid turns the
+                  // ordinary case into a wall of colour.
+                  className={`flex items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-1.5 text-sm transition ${
                     on
-                      ? "border-accent-line bg-accent-wash text-accent-strong shadow-sm"
-                      : "border-line bg-surface text-muted shadow-sm hover:border-line-strong hover:text-foreground"
+                      ? "border-accent-line bg-surface text-foreground shadow-[var(--shadow-card)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-raised)]"
+                      : "border-line bg-transparent text-muted opacity-70 hover:opacity-100"
                   }`}
                 >
-                  <span className={on ? "font-medium" : ""}>{p.name}</span>
                   <span
-                    className={`font-mono text-xs tabular-nums ${on ? "text-accent" : "text-muted"}`}
+                    aria-hidden
+                    className={`h-1.5 w-1.5 rounded-full transition ${on ? "bg-accent" : "bg-transparent ring-1 ring-line-strong"}`}
+                  />
+                  <span className={on ? "font-semibold" : ""}>{p.name}</span>
+                  <span
+                    className={`figure rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${
+                      on ? ratingTone(p.overall) : "text-muted"
+                    }`}
                   >
                     {p.overall}
                   </span>
@@ -372,7 +382,7 @@ export default function RunTab({
                     {!on && waited > 0 && (
                       <span
                         title={`Sat out ${waited} game${waited > 1 ? "s" : ""}`}
-                        className="rounded bg-amber-100 px-1 font-mono text-[10px] font-semibold text-amber-700"
+                        className="rounded bg-amber-100 px-1 font-mono text-[10px] font-semibold text-amber-300"
                       >
                         {waited}
                       </span>
@@ -444,7 +454,7 @@ export default function RunTab({
                         setResult(null);
                       }}
                       aria-label="Remove rule"
-                      className="px-1 text-muted hover:text-rose-600"
+                      className="px-1 text-muted hover:text-rose-400"
                     >
                       ✕
                     </button>
@@ -474,15 +484,13 @@ export default function RunTab({
 
       <div className="mt-6 lg:mt-0">
         {!result && (
-          <div className="hidden h-full min-h-64 place-content-center rounded-2xl border border-dashed border-line-strong bg-surface/50 px-6 text-center lg:grid">
-            <p className="text-sm text-muted">
-              {here.length < 2
-                ? "Tap who showed up to get started."
-                : onCourt.length < 2
-                  ? "Now pick who's on the court."
-                  : `${perTeam}v${perTeam} ready. Hit generate.`}
-            </p>
-          </div>
+          <StageGuide
+            surface={config.surface}
+            stage={here.length < 2 ? 0 : onCourt.length < 2 ? 1 : 2}
+            here={here.length}
+            onCourt={onCourt.length}
+            perTeam={perTeam}
+          />
         )}
 
         {result && board && (
@@ -491,7 +499,7 @@ export default function RunTab({
               <span className="text-muted">
                 Spread{" "}
                 <span
-                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-600" : liveSpread <= 3 ? "text-amber-600" : "text-rose-600"}`}
+                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-400" : liveSpread <= 3 ? "text-amber-400" : "text-rose-400"}`}
                 >
                   {liveSpread.toFixed(1)}
                 </span>
@@ -522,7 +530,7 @@ export default function RunTab({
                       setBoard({
                         teams: result.teams.map((t) => t.players),
                         bench: sitting,
-                        pinned: [],
+                        pinned: {},
                       });
                       setEdited(false);
                     }}
@@ -691,6 +699,95 @@ function RuleBuilder({
       >
         Add
       </Button>
+    </div>
+  );
+}
+
+/**
+ * Fills the second column before teams exist. It used to be an empty dashed
+ * box taking up half a laptop screen; the three stages are the one thing worth
+ * saying there, since the flow is the part of this app that needs explaining.
+ */
+function StageGuide({
+  surface,
+  stage,
+  here,
+  onCourt,
+  perTeam,
+}: {
+  surface: string;
+  stage: number;
+  here: number;
+  onCourt: number;
+  perTeam: number;
+}) {
+  const steps = [
+    {
+      title: "Who showed up",
+      body: "Tap everyone who turned out tonight.",
+      done: `${here} here`,
+    },
+    {
+      title: `On the ${surface}`,
+      body: `Pick who's playing this game — or let Auto-pick give the ${surface} to whoever has waited longest.`,
+      done: `${onCourt} playing`,
+    },
+    {
+      title: "Generate",
+      body: "Teams are built from the players on the floor, balanced on rating, size and position at once.",
+      done: perTeam > 0 ? `${perTeam}v${perTeam} ready` : "",
+    },
+  ];
+
+  return (
+    <div className="hidden rounded-2xl border border-line bg-surface/70 p-6 shadow-[var(--shadow-card)] backdrop-blur-sm lg:block">
+      <p className="eyebrow">How a run works</p>
+      <ol className="mt-4 space-y-1">
+        {steps.map((step, i) => {
+          const active = i === stage;
+          const complete = i < stage;
+          return (
+            <li
+              key={step.title}
+              className={`flex gap-3.5 rounded-xl px-3 py-3 transition ${
+                active ? "bg-accent-wash ring-1 ring-accent-line" : ""
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`figure mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  complete
+                    ? "bg-accent text-white"
+                    : active
+                      ? "bg-accent text-white"
+                      : "bg-sunken text-muted"
+                }`}
+              >
+                {complete ? "\u2713" : i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="flex items-baseline gap-2">
+                  <span
+                    className={`text-sm font-semibold ${active ? "text-accent-strong" : complete ? "text-foreground" : "text-muted"}`}
+                  >
+                    {step.title}
+                  </span>
+                  {step.done && (complete || active) && (
+                    <span className="figure text-[11px] text-muted">
+                      {step.done}
+                    </span>
+                  )}
+                </span>
+                {active && (
+                  <span className="mt-1 block text-xs leading-relaxed text-muted">
+                    {step.body}
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

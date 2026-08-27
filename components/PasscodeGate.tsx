@@ -40,7 +40,7 @@ export default function PasscodeGate({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -67,14 +67,14 @@ export default function PasscodeGate({
           autoComplete="off"
           className={`mt-4 w-full rounded-xl border bg-surface px-4 py-3 text-base tracking-widest outline-none placeholder:tracking-normal placeholder:text-muted/60 focus:ring-2 focus:ring-accent/15 ${
             failed
-              ? "border-rose-300 focus:border-rose-400"
+              ? "border-rose-300 focus:border-rose-400/60"
               : "border-line focus:border-accent"
           }`}
         />
 
         <p
           aria-live="polite"
-          className={`mt-1.5 h-4 text-xs ${failed ? "text-rose-600" : "text-transparent"}`}
+          className={`mt-1.5 h-4 text-xs ${failed ? "text-rose-400" : "text-transparent"}`}
         >
           {failed ? "That's not it. Try again." : "placeholder"}
         </p>

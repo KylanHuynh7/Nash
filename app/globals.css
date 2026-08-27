@@ -1,27 +1,30 @@
 @import "tailwindcss";
 
 /*
- * Light theme, single palette. Depth comes from layered surfaces and shadow
- * rather than the borders a dark theme leans on, so cards read as lifted off
- * the page instead of cut out of it.
+ * Dark arena theme, after NBA 2K: near-black ground, crimson accent, brushed
+ * silver on the headings. Depth comes from surfaces getting *lighter* as they
+ * come forward, which is the opposite of the light theme this replaced — on a
+ * dark ground a shadow does nothing, so elevation has to be carried by value.
  */
 :root {
-  --background: #fbfbfd;
-  --surface: #ffffff;
-  --surface-sunken: #f4f5f8;
-  --surface-raised: #ffffff;
-  --border: #e6e8f0;
-  --border-strong: #d2d7e4;
-  --foreground: #14161c;
-  --muted: #6b7280;
+  --background: #08090c;
+  --surface: #15181f;
+  --surface-sunken: #0e1014;
+  --surface-raised: #1d212a;
+  --border: #272c37;
+  --border-strong: #3d4453;
+  --foreground: #f3f5f9;
+  --muted: #949cb0;
 
-  --accent: #4f46e5;
-  --accent-strong: #4338ca;
-  --accent-wash: #eef2ff;
-  --accent-line: #c7d2fe;
+  /* 2K red. Each sport still overrides this with its own. */
+  --accent: #e01e37;
+  --accent-strong: #ff4056;
+  --accent-wash: #2a1219;
+  --accent-line: #6b1f2c;
 
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
-  --shadow-lift: 0 12px 28px rgb(16 24 40 / 0.14), 0 2px 6px rgb(16 24 40 / 0.08);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-raised: 0 4px 10px rgb(0 0 0 / 0.5), 0 14px 32px rgb(0 0 0 / 0.45);
+  --shadow-lift: 0 24px 60px rgb(0 0 0 / 0.7), 0 6px 16px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -37,14 +40,17 @@
   --color-accent-strong: var(--accent-strong);
   --color-accent-wash: var(--accent-wash);
   --color-accent-line: var(--accent-line);
+  --shadow-raised: var(--shadow-raised);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  /* A whisper of the accent at the top so the page isn't a flat sheet. */
+  /* Court-light spill: a hot wash of the sport's colour up top, falling off
+     into black, so the page reads as an arena rather than a dark rectangle. */
   background:
-    radial-gradient(80rem 32rem at 50% -12rem, color-mix(in srgb, var(--accent) 7%, transparent), transparent),
+    radial-gradient(70rem 34rem at 12% -10rem, color-mix(in srgb, var(--accent) 34%, transparent), transparent),
+    radial-gradient(56rem 30rem at 94% -4rem, color-mix(in srgb, var(--accent) 16%, transparent), transparent),
     var(--background);
   background-attachment: fixed;
   color: var(--foreground);
@@ -52,10 +58,58 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Ratings are the whole product, so figures get treated as a design element:
+   one width, no wandering baseline when a number changes. */
+.figure {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Brushed steel, the way the box art sets its type. Falls back to plain white
+   anywhere background-clip:text isn't honoured. */
+.metal {
+  color: #fff;
+  background: linear-gradient(
+    177deg,
+    #ffffff 0%,
+    #e8ecf5 38%,
+    #939cb0 54%,
+    #ffffff 74%,
+    #c6ccd9 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+}
+
+/* The small all-caps labels that head each section. */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* One diagonal cut, used on the accent blocks. Angles are most of what makes
+   2K's chrome read as 2K, but only where they cost nothing to hit-test. */
+.cut {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 0.55rem), calc(100% - 0.55rem) 100%, 0 100%);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: #fff;
 }
 
 /* Range inputs are the main editing control, so they get real styling. */
@@ -75,8 +129,8 @@ input[type="range"]::-webkit-slider-runnable-track {
     to right,
     var(--accent) 0%,
     var(--accent) var(--fill, 50%),
-    #e3e6ef var(--fill, 50%),
-    #e3e6ef 100%
+    var(--surface-sunken) var(--fill, 50%),
+    var(--surface-sunken) 100%
   );
 }
 
@@ -100,7 +154,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
 input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 999px;
-  background: #e3e6ef;
+  background: var(--surface-sunken);
 }
 
 input[type="range"]::-moz-range-progress {

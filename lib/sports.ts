@@ -66,7 +66,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     emoji: "🏀",
     defaultTeams: 2,
     sideSize: 5,
-    accent: "#4f46e5",
+    accent: "#e01e37",
     surface: "court",
     attributes: [
       // Weighted for full-court games to 11: you run the whole floor, boards
@@ -130,7 +130,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
     emoji: "\u{1F3C8}",
     defaultTeams: 2,
     sideSize: 5,
-    accent: "#0d9488",
+    accent: "#16a34a",
     surface: "field",
     criticalPosition: "qb",
     attributes: [

@@ -81,9 +81,11 @@ export default function SportApp({
           // The lighter and darker accents are derived so a sport only ever
           // declares one colour.
           "--accent": config.accent,
-          "--accent-strong": `color-mix(in srgb, ${config.accent} 82%, black)`,
-          "--accent-wash": `color-mix(in srgb, ${config.accent} 9%, white)`,
-          "--accent-line": `color-mix(in srgb, ${config.accent} 32%, white)`,
+          // On a dark ground the derived shades mix toward the page, not
+          // toward white: a hover that brightens, a wash that stays black.
+          "--accent-strong": `color-mix(in srgb, ${config.accent} 72%, white)`,
+          "--accent-wash": `color-mix(in srgb, ${config.accent} 15%, #0e1014)`,
+          "--accent-line": `color-mix(in srgb, ${config.accent} 42%, #0e1014)`,
         } as React.CSSProperties
       }
     >
@@ -98,13 +100,19 @@ export default function SportApp({
           </Link>
           {/* The sport's colour has to appear somewhere solid, or the accent
               only ever exists as a tint nobody registers. */}
-          <h1 className="text-xl font-bold tracking-tight">
-            <span aria-hidden className="mr-1.5">
-              {config.emoji}
-            </span>
-            {config.label}
-          </h1>
+          <span
+            aria-hidden
+            className="cut flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-xl shadow-[0_0_22px_color-mix(in_srgb,var(--accent)_55%,transparent)]"
+          >
+            {config.emoji}
+          </span>
           <div className="min-w-0">
+            <h1 className="metal truncate text-2xl leading-none">
+              {config.label}
+            </h1>
+            <p className="eyebrow mt-1">
+              {roster.length} rated · {config.sideSize}-a-side
+            </p>
           </div>
         </div>
         <Button
@@ -118,7 +126,7 @@ export default function SportApp({
 
       <div
         role="tablist"
-        className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line bg-sunken p-1 shadow-inner lg:max-w-sm"
+        className="mb-6 grid grid-cols-2 gap-1 rounded-lg border border-line bg-sunken p-1 lg:max-w-sm"
       >
         {(
           [
@@ -131,10 +139,10 @@ export default function SportApp({
             role="tab"
             aria-selected={tab === key}
             onClick={() => setTab(key)}
-            className={`rounded-lg py-2.5 text-sm transition ${
+            className={`rounded-md py-2.5 text-sm uppercase tracking-wider transition ${
               tab === key
-                ? "bg-surface font-semibold text-foreground shadow-sm"
-                : "text-muted hover:text-foreground"
+                ? "bg-accent font-bold text-white shadow-[0_0_18px_color-mix(in_srgb,var(--accent)_45%,transparent)]"
+                : "font-semibold text-muted hover:text-foreground"
             }`}
           >
             {label}
@@ -214,7 +222,7 @@ function RosterList({
         <li key={p.id}>
           <button
             onClick={() => onOpen(p)}
-            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-left shadow-[var(--shadow-card)] transition hover:border-accent-line hover:shadow-md active:translate-y-px"
+            className="group flex w-full items-center gap-3 rounded-lg border border-line bg-surface py-3 pl-3 pr-4 text-left shadow-[var(--shadow-card)] transition hover:border-accent hover:bg-raised active:translate-y-px"
           >
             {/* The list is sorted by rating, so say so — otherwise the order is
                 information the eye has to reconstruct from the numbers. */}

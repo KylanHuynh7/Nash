@@ -149,7 +149,7 @@ export default function CourtView({
 }) {
   const spots = new Map(config.spots.map((s) => [s.key, s]));
   return (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-line bg-sunken shadow-[var(--shadow-card)]">
+    <div className="relative w-full overflow-hidden rounded-lg border border-line bg-[radial-gradient(120%_90%_at_50%_0%,color-mix(in_srgb,var(--accent)_14%,var(--surface-sunken)),var(--surface-sunken))] shadow-[var(--shadow-card)]">
       {config.id === "football" ? <FieldMarkings /> : <CourtMarkings />}
       <div className="relative aspect-[3/4] w-full sm:aspect-[5/4]">
         {matchups.map((m) => {
@@ -176,7 +176,7 @@ function CourtMarkings() {
       aria-hidden
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 h-full w-full text-line-strong"
+      className="pointer-events-none absolute inset-0 h-full w-full text-white/25"
     >
       <rect
         x="1"
@@ -186,7 +186,7 @@ function CourtMarkings() {
         rx="2"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.4"
+        strokeWidth="0.55"
       />
       {/* Paint */}
       <rect
@@ -196,7 +196,7 @@ function CourtMarkings() {
         height="30"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.4"
+        strokeWidth="0.55"
       />
       {/* Free-throw circle */}
       <circle
@@ -205,14 +205,14 @@ function CourtMarkings() {
         r="10"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.4"
+        strokeWidth="0.55"
       />
       {/* Three-point arc */}
       <path
         d="M 12 1 L 12 26 A 38 38 0 0 0 88 26 L 88 1"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.4"
+        strokeWidth="0.55"
       />
       {/* Rim */}
       <circle
@@ -234,7 +234,7 @@ function FieldMarkings() {
       aria-hidden
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 h-full w-full text-line-strong"
+      className="pointer-events-none absolute inset-0 h-full w-full text-white/25"
     >
       <rect
         x="1"
@@ -244,7 +244,7 @@ function FieldMarkings() {
         rx="2"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.4"
+        strokeWidth="0.55"
       />
       {/* End zone across the top */}
       <rect

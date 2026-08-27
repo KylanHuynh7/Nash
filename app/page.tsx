@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-5 py-16 sm:max-w-2xl">
       <header className="space-y-3">
-        <h1 className="text-4xl font-bold tracking-tight">Last Dance</h1>
+        <h1 className="metal text-5xl leading-none">Last Dance</h1>
         <p className="text-[15px] leading-relaxed text-muted">
           The roster lives here. Tap who showed up, get teams that are actually
           even. No re-explaining everybody every single time.
@@ -21,7 +21,7 @@ export default function Home() {
               <div
                 key={id}
                 aria-disabled
-                className="flex items-center gap-4 rounded-2xl border border-dashed border-line-strong bg-sunken px-5 py-5 opacity-70"
+                className="flex items-center gap-4 rounded-lg border border-dashed border-line-strong bg-sunken px-5 py-5 opacity-60"
               >
                 <span aria-hidden className="text-3xl grayscale">
                   {sport.emoji}
@@ -40,7 +40,7 @@ export default function Home() {
             <Link
               key={id}
               href={`/${id}`}
-              className="group flex items-center gap-4 rounded-2xl border border-line bg-surface px-5 py-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-accent-line hover:shadow-md"
+              className="group flex items-center gap-4 rounded-lg border border-line bg-surface px-5 py-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-accent hover:bg-raised"
             >
               <span aria-hidden className="text-3xl">
                 {sport.emoji}
