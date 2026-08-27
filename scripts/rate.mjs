@@ -12,7 +12,7 @@ import { neon } from "@neondatabase/serverless";
 const sql = neon(process.env.DATABASE_URL);
 
 const KEYS = ["shooting", "finishing", "playmaking", "defense", "rebounding", "athleticism"];
-const WEIGHTS = { shooting: 1.15, finishing: 1.1, playmaking: 1.05, defense: 1.1, rebounding: 0.85, athleticism: 0.95 };
+const WEIGHTS = { shooting: 1.05, finishing: 1.15, playmaking: 1.0, defense: 1.1, rebounding: 1.15, athleticism: 1.25 };
 
 const [name, position, ...rest] = process.argv.slice(2);
 // Optional trailing height as 5'11" or 71.

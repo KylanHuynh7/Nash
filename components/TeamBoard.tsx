@@ -16,6 +16,8 @@ import {
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { Rating, teamColor } from "@/components/ui";
+import CourtView, { buildMatchups } from "@/components/CourtView";
+import type { SportConfig } from "@/lib/sports";
 import type { BalancePlayer } from "@/lib/balance";
 
 export type Board = {
@@ -71,14 +73,25 @@ function move(board: Board, playerId: string, to: string): Board {
   return { teams, bench };
 }
 
+/** Re-labels a player's position, leaving their team membership alone. */
+function reposition(board: Board, playerId: string, position: string): Board {
+  const apply = (list: BalancePlayer[]) =>
+    list.map((p) => (p.id === playerId ? { ...p, position } : p));
+  return { teams: board.teams.map(apply), bench: apply(board.bench) };
+}
+
 export default function TeamBoard({
   board,
   onChange,
   positionLabel,
+  config,
+  view,
 }: {
   board: Board;
   onChange: (next: Board) => void;
   positionLabel: Map<string, string>;
+  config: SportConfig;
+  view: "list" | "court";
 }) {
   const [dragging, setDragging] = useState<BalancePlayer | null>(null);
 
@@ -101,9 +114,19 @@ export default function TeamBoard({
   }
 
   function handleEnd(event: DragEndEvent) {
+    const dropped = dragging;
     setDragging(null);
     const over = event.over?.id;
-    if (typeof over !== "string") return;
+    if (typeof over !== "string" || !dropped) return;
+
+    // On the court, dropping onto a spot swaps within the position rather than
+    // changing teams — the spot belongs to both sides at once.
+    if (over.startsWith("spot-")) {
+      const position = over.slice("spot-".length);
+      onChange(reposition(board, dropped.id, position));
+      return;
+    }
+
     onChange(move(board, String(event.active.id), over));
   }
 
@@ -116,19 +139,26 @@ export default function TeamBoard({
       onDragEnd={handleEnd}
       onDragCancel={() => setDragging(null)}
     >
-      <div className="grid gap-3 sm:grid-cols-2">
-        {board.teams.map((players, i) => (
-          <Column
-            key={teamId(i)}
-            id={teamId(i)}
-            title={teamColor(i).label}
-            colorIndex={i}
-            players={players}
-            positionLabel={positionLabel}
-            flagSize={uneven}
-          />
-        ))}
-      </div>
+      {view === "court" ? (
+        <CourtView
+          matchups={buildMatchups(config, board.teams)}
+          teamCount={board.teams.length}
+        />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {board.teams.map((players, i) => (
+            <Column
+              key={teamId(i)}
+              id={teamId(i)}
+              title={teamColor(i).label}
+              colorIndex={i}
+              players={players}
+              positionLabel={positionLabel}
+              flagSize={uneven}
+            />
+          ))}
+        </div>
+      )}
 
       <Column
         id={BENCH}

@@ -45,41 +45,43 @@ export const SPORTS: Record<SportId, SportConfig> = {
     sideSize: 5,
     accent: "#4f46e5",
     attributes: [
+      // Weighted for full-court games to 11: you run the whole floor, boards
+      // start breaks, and the man who can still go at 9-9 decides it.
       {
-        key: "shooting",
-        label: "Shooting",
-        hint: "Catch-and-shoot, range, free throws",
-        weight: 1.15,
+        key: "athleticism",
+        label: "Athleticism",
+        hint: "Speed, hops, and conditioning — you run all game",
+        weight: 1.25,
       },
       {
         key: "finishing",
         label: "Finishing",
-        hint: "Layups, contact, scoring inside",
-        weight: 1.1,
-      },
-      {
-        key: "playmaking",
-        label: "Playmaking",
-        hint: "Handles, passing, decisions",
-        weight: 1.05,
-      },
-      {
-        key: "defense",
-        label: "Defense",
-        hint: "On-ball pressure, help, steals",
-        weight: 1.1,
+        hint: "Layups, contact, scoring inside and in transition",
+        weight: 1.15,
       },
       {
         key: "rebounding",
         label: "Rebounding",
-        hint: "Boxing out, second chances",
-        weight: 0.85,
+        hint: "Boxing out, second chances, starting the break",
+        weight: 1.15,
       },
       {
-        key: "athleticism",
-        label: "Athleticism",
-        hint: "Speed, hops, motor, conditioning",
-        weight: 0.95,
+        key: "defense",
+        label: "Defense",
+        hint: "On-ball pressure, help, getting back",
+        weight: 1.1,
+      },
+      {
+        key: "shooting",
+        label: "Shooting",
+        hint: "Catch-and-shoot, range, free throws",
+        weight: 1.05,
+      },
+      {
+        key: "playmaking",
+        label: "Playmaking",
+        hint: "Handles, passing, pushing it in transition",
+        weight: 1.0,
       },
     ],
     positions: [

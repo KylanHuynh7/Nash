@@ -68,6 +68,6 @@ rows.forEach((r, i) => {
 // A short legend keeps the scale from being read as an absolute grade.
 lines.push("");
 lines.push(cell("Scale: 65 = lowest in this group, 99 = highest. Relative to these 15 only."));
-lines.push(cell("Weights: Shooting 1.15, Finishing 1.10, Playmaking 1.05, Defense 1.10, Rebounding 0.85, Athleticism 0.95"));
+lines.push(cell("Weights (full court to 11): Athleticism 1.25, Finishing 1.15, Rebounding 1.15, Defense 1.10, Shooting 1.05, Playmaking 1.00"));
 
 console.log(lines.join("\n"));

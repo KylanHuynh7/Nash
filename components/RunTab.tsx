@@ -43,6 +43,7 @@ export default function RunTab({
   /** Editable copy of the generated teams; drag-and-drop writes here. */
   const [board, setBoard] = useState<Board | null>(null);
   const [edited, setEdited] = useState(false);
+  const [view, setView] = useState<"list" | "court">("court");
   const [showRules, setShowRules] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "saving" | "copied">(
     "idle",
@@ -344,6 +345,22 @@ export default function RunTab({
                 )}
               </span>
               <div className="flex items-center gap-3">
+                <div className="flex rounded-lg border border-line bg-sunken p-0.5">
+                  {(["court", "list"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setView(mode)}
+                      aria-pressed={view === mode}
+                      className={`rounded-md px-2.5 py-1 text-xs capitalize transition ${
+                        view === mode
+                          ? "bg-surface font-semibold text-foreground shadow-sm"
+                          : "text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
                 {edited && (
                   <button
                     onClick={() => {
@@ -383,6 +400,8 @@ export default function RunTab({
 
             <TeamBoard
               board={board}
+              config={config}
+              view={view}
               positionLabel={positionLabel}
               onChange={(next) => {
                 setBoard(next);
@@ -391,8 +410,9 @@ export default function RunTab({
             />
 
             <p className="text-center text-xs text-muted">
-              Drag anyone between teams or down to Next up — the spread updates
-              as you go.
+              {view === "court"
+                ? "Drag onto a spot to change position, or down to Next up. The team that's ahead owns the +."
+                : "Drag anyone between teams or down to Next up — the spread updates as you go."}
             </p>
 
             <Button
