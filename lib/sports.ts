@@ -83,9 +83,11 @@ export const SPORTS: Record<SportId, SportConfig> = {
       },
     ],
     positions: [
-      { key: "guard", label: "G", full: "Guard" },
-      { key: "wing", label: "W", full: "Wing" },
-      { key: "big", label: "B", full: "Big" },
+      { key: "pg", label: "PG", full: "Point Guard" },
+      { key: "sg", label: "SG", full: "Shooting Guard" },
+      { key: "sf", label: "SF", full: "Small Forward" },
+      { key: "pf", label: "PF", full: "Power Forward" },
+      { key: "c", label: "C", full: "Center" },
     ],
   },
   football: {
@@ -152,9 +154,9 @@ export function isSportId(value: string): value is SportId {
   return value === "basketball" || value === "football";
 }
 
-export const RATING_MIN = 25;
+export const RATING_MIN = 65;
 export const RATING_MAX = 99;
-export const RATING_DEFAULT = 70;
+export const RATING_DEFAULT = 80;
 
 /** Weighted mean of a player's attributes, clamped to the 25-99 rating scale. */
 export function computeOverall(

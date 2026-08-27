@@ -26,7 +26,7 @@ if (rest.length > KEYS.length) {
 }
 const values = rest;
 if (!name || !position || values.length !== KEYS.length) {
-  console.error(`usage: rate.mjs <name> <guard|wing|big> ${KEYS.map((k) => `<${k}>`).join(" ")} [height]`);
+  console.error(`usage: rate.mjs <name> <pg|sg|sf|pf|c> ${KEYS.map((k) => `<${k}>`).join(" ")} [height]`);
   process.exit(1);
 }
 
@@ -36,19 +36,21 @@ const overall = Math.round(
   KEYS.reduce((s, k) => s + ratings[k] * WEIGHTS[k], 0) / weightSum,
 );
 
-const [player] = await sql`select id from players where name = ${name} limit 1`;
+let [player] = await sql`select id from players where name = ${name} limit 1`;
+let created = false;
 if (!player) {
-  console.error(`no player named "${name}"`);
-  process.exit(1);
+  [player] = await sql`insert into players (name) values (${name}) returning id`;
+  created = true;
 }
 
 await sql`
-  update profiles
-     set position = ${position},
-         ratings = ${JSON.stringify(ratings)},
-         overall = ${overall},
+  insert into profiles (player_id, sport, position, ratings, overall)
+  values (${player.id}, 'basketball', ${position}, ${JSON.stringify(ratings)}, ${overall})
+  on conflict (player_id, sport) do update
+     set position = excluded.position,
+         ratings = excluded.ratings,
+         overall = excluded.overall,
          updated_at = now()
-   where player_id = ${player.id} and sport = 'basketball'
 `;
 
 if (height !== null && Number.isFinite(height)) {
@@ -56,5 +58,5 @@ if (height !== null && Number.isFinite(height)) {
 }
 
 const shown = height ? ` ${Math.floor(height / 12)}'${height % 12}"` : "";
-console.log(`${name} → ${position}${shown}, overall ${overall}`);
+console.log(`${name}${created ? " (new)" : ""} → ${position}${shown}, overall ${overall}`);
 console.log("  " + KEYS.map((k) => `${k} ${ratings[k]}`).join("  "));

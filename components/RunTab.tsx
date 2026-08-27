@@ -33,7 +33,7 @@ export default function RunTab({
   onAddPlayer: () => void;
 }) {
   const [present, setPresent] = useState<Set<string>>(new Set());
-  const [teamCount, setTeamCount] = useState(config.defaultTeams);
+  const teamCount = 2;
   const [result, setResult] = useState<BalanceResult | null>(null);
   const [seed, setSeed] = useState(1);
   const [rules, setRules] = useState<Rule[]>([]);
@@ -56,7 +56,9 @@ export default function RunTab({
   // Even sides are the point: with 11 players and 2 teams that's 5v5 and one
   // player sitting, not 6v5.
   const perTeam =
-    here.length >= teamCount ? Math.floor(here.length / teamCount) : 0;
+    here.length >= teamCount
+      ? Math.min(config.sideSize, Math.floor(here.length / teamCount))
+      : 0;
   const sitCount = here.length - perTeam * teamCount;
 
   const criticalLabel = useMemo(() => {
@@ -177,8 +179,6 @@ export default function RunTab({
     );
   }
 
-  const maxTeams = Math.max(2, Math.min(4, here.length));
-
   return (
     <div className="lg:grid lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:items-start lg:gap-10">
       <div className="space-y-6">
@@ -236,34 +236,20 @@ export default function RunTab({
 
         <section className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
           <div>
-            <p className="text-sm font-medium">Teams</p>
+            <p className="text-sm font-medium">
+              {perTeam > 0 ? `${perTeam}v${perTeam}` : "Not enough yet"}
+            </p>
             <p className="text-xs text-muted">
-              {here.length < teamCount
-                ? `Need at least ${teamCount} players`
-                : `${perTeam} per side${sitCount > 0 ? ` · ${sitCount} sitting` : ""}`}
+              {here.length < 2
+                ? `Tap at least 2 players`
+                : sitCount > 0
+                  ? `${sitCount} sitting, rotating each reshuffle`
+                  : "Everybody plays"}
             </p>
           </div>
-          <div className="flex gap-1.5">
-            {[2, 3, 4].map((n) => (
-              <button
-                key={n}
-                onClick={() => {
-                  setTeamCount(n);
-                  setResult(null);
-                  setBoard(null);
-                }}
-                disabled={n > maxTeams}
-                aria-pressed={teamCount === n}
-                className={`h-10 w-10 rounded-xl border font-mono text-sm transition disabled:opacity-25 ${
-                  teamCount === n
-                    ? "border-accent bg-accent/15 font-semibold text-accent"
-                    : "border-line bg-raised text-muted"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          <span className="font-mono text-2xl tabular-nums text-muted">
+            {here.length}
+          </span>
         </section>
 
         <section>
