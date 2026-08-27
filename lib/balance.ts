@@ -3,6 +3,8 @@ export type BalancePlayer = {
   name: string;
   overall: number;
   position: string;
+  /** Only used to keep spillover placements sane; balancing ignores it. */
+  heightInches?: number | null;
 };
 
 export type Constraint = { a: string; b: string };
@@ -83,7 +85,10 @@ function buildUnits(players: BalancePlayer[], together: Constraint[]): Unit[] {
 function targetSizes(playerCount: number, teamCount: number): number[] {
   const base = Math.floor(playerCount / teamCount);
   const extra = playerCount % teamCount;
-  return Array.from({ length: teamCount }, (_, i) => base + (i < extra ? 1 : 0));
+  return Array.from(
+    { length: teamCount },
+    (_, i) => base + (i < extra ? 1 : 0),
+  );
 }
 
 function cost(
@@ -95,8 +100,12 @@ function cost(
   apart: Constraint[],
 ): number {
   const teamCount = assignment.length;
-  const totals = assignment.map((units) => units.reduce((s, u) => s + u.total, 0));
-  const counts = assignment.map((units) => units.reduce((s, u) => s + u.size, 0));
+  const totals = assignment.map((units) =>
+    units.reduce((s, u) => s + u.total, 0),
+  );
+  const counts = assignment.map((units) =>
+    units.reduce((s, u) => s + u.size, 0),
+  );
 
   // Strength: penalise deviation of each team's average from the overall average.
   const grandTotal = totals.reduce((s, t) => s + t, 0);
@@ -124,7 +133,8 @@ function cost(
         (s, u) => s + u.members.filter((m) => m.position === pos).length,
         0,
       );
-      const ideal = playerCount > 0 ? (totalAtPos * counts[t]) / playerCount : 0;
+      const ideal =
+        playerCount > 0 ? (totalAtPos * counts[t]) / playerCount : 0;
       const diff = have - ideal;
       shape += diff * diff;
     }
@@ -149,20 +159,28 @@ export function balanceTeams(
   players: BalancePlayer[],
   options: BalanceOptions,
 ): BalanceResult {
-  const teamCount = Math.max(2, Math.min(options.teamCount, Math.max(2, players.length)));
+  const teamCount = Math.max(
+    2,
+    Math.min(options.teamCount, Math.max(2, players.length)),
+  );
   const together = options.together ?? [];
   const apart = options.apart ?? [];
   const rand = mulberry32(options.seed ?? 1);
 
   if (players.length === 0) {
-    return { teams: Array.from({ length: teamCount }, () => emptyTeam()), spread: 0, unmet: [] };
+    return {
+      teams: Array.from({ length: teamCount }, () => emptyTeam()),
+      spread: 0,
+      unmet: [],
+    };
   }
 
   const units = buildUnits(players, together);
   const sizes = targetSizes(players.length, teamCount);
   const positions = [...new Set(players.map((p) => p.position))];
   const positionTotals = new Map<string, number>();
-  for (const p of players) positionTotals.set(p.position, (positionTotals.get(p.position) ?? 0) + 1);
+  for (const p of players)
+    positionTotals.set(p.position, (positionTotals.get(p.position) ?? 0) + 1);
 
   const evaluate = (assignment: Unit[][]) =>
     cost(assignment, sizes, positions, positionTotals, players.length, apart);
@@ -244,7 +262,8 @@ export function balanceTeams(
     }
   }
 
-  const solution = best ?? Array.from({ length: teamCount }, () => [] as Unit[]);
+  const solution =
+    best ?? Array.from({ length: teamCount }, () => [] as Unit[]);
   const teams: BalancedTeam[] = solution.map((unitList) => {
     const roster = unitList
       .flatMap((u) => u.members)
@@ -253,11 +272,15 @@ export function balanceTeams(
     return {
       players: roster,
       total,
-      average: roster.length ? Math.round((total / roster.length) * 10) / 10 : 0,
+      average: roster.length
+        ? Math.round((total / roster.length) * 10) / 10
+        : 0,
     };
   });
 
-  const averages = teams.filter((t) => t.players.length > 0).map((t) => t.average);
+  const averages = teams
+    .filter((t) => t.players.length > 0)
+    .map((t) => t.average);
   const spread = averages.length
     ? Math.round((Math.max(...averages) - Math.min(...averages)) * 10) / 10
     : 0;

@@ -27,6 +27,13 @@ const SPOTS: Record<string, { x: number; y: number }> = {
 };
 
 /**
+ * Slots from biggest to smallest. Used only to place players who could not get
+ * their own position, so the tallest spare ends up nearest the rim rather than
+ * a 5'5" guard landing at centre.
+ */
+const SIZE_ORDER = ["c", "pf", "sf", "sg", "pg"] as const;
+
+/**
  * Pairs each team's players by position. Anyone whose position is already
  * taken on their own team spills into the next open spot, so ten players
  * always land somewhere rather than silently vanishing.
@@ -52,15 +59,60 @@ export function buildMatchups(
       if (slot) slot.players[teamIndex] = player;
       else leftover.push(player);
     }
-    // Strongest leftovers claim the remaining spots first.
-    leftover.sort((a, b) => b.overall - a.overall);
-    for (const player of leftover) {
-      const slot = slots.find((s) => s.players[teamIndex] === null);
+    // Tallest spare takes the biggest open spot. Unknown heights sit in the
+    // middle rather than being treated as short.
+    const height = (p: BalancePlayer) => p.heightInches ?? 70;
+    leftover.sort((a, b) => height(b) - height(a) || b.overall - a.overall);
+
+    const openBySize = SIZE_ORDER.map((key) =>
+      slots.find((s) => s.position === key && s.players[teamIndex] === null),
+    ).filter((s): s is Matchup => Boolean(s));
+
+    leftover.forEach((player, i) => {
+      const slot = openBySize[i];
       if (slot) slot.players[teamIndex] = player;
-    }
+    });
+
+    settleByHeight(slots, teamIndex);
   });
 
   return slots;
+}
+
+/**
+ * Swaps players between spots when someone at a bigger spot is well shorter
+ * than someone at a smaller one.
+ *
+ * The tolerance is the point: an inch or two either way leaves a stated
+ * position alone, because the game really is positionless. It only steps in
+ * for the placement anyone would object to — a 5'5" guard at centre while a
+ * 6'2" teammate runs the point.
+ */
+const HEIGHT_TOLERANCE = 3;
+
+function settleByHeight(slots: Matchup[], teamIndex: number) {
+  const bySize = SIZE_ORDER.map((key) =>
+    slots.find((s) => s.position === key),
+  ).filter((s): s is Matchup => Boolean(s));
+
+  const height = (p: BalancePlayer | null) => p?.heightInches ?? 70;
+
+  for (let pass = 0; pass < bySize.length; pass++) {
+    let swapped = false;
+    for (let i = 0; i < bySize.length; i++) {
+      for (let j = i + 1; j < bySize.length; j++) {
+        const bigger = bySize[i].players[teamIndex];
+        const smaller = bySize[j].players[teamIndex];
+        if (!bigger || !smaller) continue;
+        if (height(smaller) - height(bigger) > HEIGHT_TOLERANCE) {
+          bySize[i].players[teamIndex] = smaller;
+          bySize[j].players[teamIndex] = bigger;
+          swapped = true;
+        }
+      }
+    }
+    if (!swapped) break;
+  }
 }
 
 export default function CourtView({
