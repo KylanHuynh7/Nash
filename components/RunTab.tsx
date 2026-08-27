@@ -32,7 +32,10 @@ export default function RunTab({
   roster: RosterEntry[];
   onAddPlayer: () => void;
 }) {
+  /** Everyone who showed up tonight. */
   const [present, setPresent] = useState<Set<string>>(new Set());
+  /** Of those, the ones taking the floor this game. The rest wait. */
+  const [playing, setPlaying] = useState<Set<string>>(new Set());
   const teamCount = 2;
   const [result, setResult] = useState<BalanceResult | null>(null);
   const [seed, setSeed] = useState(1);
@@ -54,13 +57,19 @@ export default function RunTab({
     [roster, present],
   );
 
-  // Even sides are the point: with 11 players and 2 teams that's 5v5 and one
-  // player sitting, not 6v5.
+  const onCourt = useMemo(
+    () => here.filter((p) => playing.has(p.id)),
+    [here, playing],
+  );
+
   const perTeam =
-    here.length >= teamCount
-      ? Math.min(config.sideSize, Math.floor(here.length / teamCount))
-      : 0;
-  const sitCount = here.length - perTeam * teamCount;
+    onCourt.length >= teamCount ? Math.floor(onCourt.length / teamCount) : 0;
+  const sitCount = here.length - onCourt.length;
+  /** A full game, or as close as the turnout allows. */
+  const courtCap = Math.min(
+    config.sideSize * teamCount,
+    here.length - (here.length % teamCount),
+  );
 
   const criticalLabel = useMemo(() => {
     const key = config.criticalPosition;
@@ -84,30 +93,49 @@ export default function RunTab({
     [config],
   );
 
-  function toggle(id: string) {
-    setPresent((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  function clearResult() {
     setResult(null);
     setBoard(null);
     setShareState("idle");
   }
 
-  function generate(nextSeed: number) {
-    // Whoever has sat the fewest times goes first, so nobody sits twice before
-    // everyone has sat once. Ties break deterministically off the seed.
-    const ordered = [...here].sort((a, b) => {
-      const byTurns = (sitOutCounts[a.id] ?? 0) - (sitOutCounts[b.id] ?? 0);
-      if (byTurns !== 0) return byTurns;
-      return jitter(a.id, nextSeed) - jitter(b.id, nextSeed);
+  function togglePresent(id: string) {
+    setPresent((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      // Someone who went home can't still be on the floor.
+      setPlaying((p) => new Set([...p].filter((x) => next.has(x))));
+      return next;
     });
+    clearResult();
+  }
 
-    const benched = ordered.slice(0, sitCount);
-    const benchedIds = new Set(benched.map((p) => p.id));
-    const playing = here.filter((p) => !benchedIds.has(p.id));
+  function togglePlaying(id: string) {
+    setPlaying((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    clearResult();
+  }
+
+  /** Fills the floor with whoever has sat the most, so waiting evens out. */
+  function autoPick() {
+    const ordered = [...here].sort(
+      (a, b) =>
+        (sitOutCounts[b.id] ?? 0) - (sitOutCounts[a.id] ?? 0) ||
+        jitter(a.id, seed) - jitter(b.id, seed),
+    );
+    setPlaying(new Set(ordered.slice(0, courtCap).map((p) => p.id)));
+    clearResult();
+  }
+
+  function generate(nextSeed: number) {
+    // Who plays is already decided upstairs; anyone here but not on the floor
+    // is waiting, and their wait count grows so auto-pick can even it out.
+    const benched = here.filter((p) => !playing.has(p.id));
 
     if (benched.length > 0) {
       setSitOutCounts((prev) => {
@@ -119,15 +147,9 @@ export default function RunTab({
     setSitting(benched);
 
     // Rules only bind players who are actually on the floor.
-    const active = rules.filter(
-      (r) =>
-        present.has(r.a) &&
-        present.has(r.b) &&
-        !benchedIds.has(r.a) &&
-        !benchedIds.has(r.b),
-    );
+    const active = rules.filter((r) => playing.has(r.a) && playing.has(r.b));
 
-    const next = balanceTeams(playing, {
+    const next = balanceTeams(onCourt, {
       teamCount,
       seed: nextSeed,
       together: active.filter((r) => r.kind === "together"),
@@ -186,7 +208,7 @@ export default function RunTab({
         <section>
           <div className="mb-2.5 flex items-baseline justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wider text-muted">
-              Who&apos;s here
+              Who showed up
             </h2>
             <div className="flex items-center gap-3 text-sm">
               <span className="font-mono tabular-nums text-muted">
@@ -194,13 +216,12 @@ export default function RunTab({
               </span>
               <button
                 onClick={() => {
+                  const all = here.length === roster.length;
                   setPresent(
-                    here.length === roster.length
-                      ? new Set()
-                      : new Set(roster.map((p) => p.id)),
+                    all ? new Set() : new Set(roster.map((p) => p.id)),
                   );
-                  setResult(null);
-                  setBoard(null);
+                  if (all) setPlaying(new Set());
+                  clearResult();
                 }}
                 className="text-accent hover:underline"
               >
@@ -215,12 +236,12 @@ export default function RunTab({
               return (
                 <button
                   key={p.id}
-                  onClick={() => toggle(p.id)}
+                  onClick={() => togglePresent(p.id)}
                   aria-pressed={on}
                   className={`flex items-center gap-2 rounded-full border py-2 pl-3 pr-2.5 text-sm transition ${
                     on
-                      ? "border-accent bg-accent/15 text-foreground"
-                      : "border-line bg-surface text-muted hover:border-neutral-600"
+                      ? "border-accent-line bg-accent-wash text-accent-strong shadow-sm"
+                      : "border-line bg-surface text-muted shadow-sm hover:border-line-strong hover:text-foreground"
                   }`}
                 >
                   <span className={on ? "font-medium" : ""}>{p.name}</span>
@@ -235,21 +256,93 @@ export default function RunTab({
           </div>
         </section>
 
+        {here.length >= 2 && (
+          <section>
+            <div className="mb-2.5 flex items-baseline justify-between">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-muted">
+                On the court
+              </h2>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="font-mono tabular-nums text-muted">
+                  {onCourt.length}/{here.length}
+                </span>
+                <button
+                  onClick={autoPick}
+                  className="text-accent hover:underline"
+                >
+                  Auto-pick {courtCap}
+                </button>
+                {onCourt.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setPlaying(new Set());
+                      clearResult();
+                    }}
+                    className="text-muted hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {onCourt.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-line-strong bg-surface/50 px-3 py-3 text-center text-xs text-muted">
+                Pick who&apos;s playing this game, or auto-pick to give the
+                longest-waiting {courtCap} the floor.
+              </p>
+            ) : null}
+
+            <div className="mt-2 flex flex-wrap gap-2">
+              {here.map((p) => {
+                const on = playing.has(p.id);
+                const waited = sitOutCounts[p.id] ?? 0;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => togglePlaying(p.id)}
+                    aria-pressed={on}
+                    className={`flex items-center gap-2 rounded-full border py-2 pl-3 pr-2.5 text-sm transition ${
+                      on
+                        ? "border-accent bg-accent text-white shadow-sm"
+                        : "border-line bg-surface text-muted shadow-sm hover:border-line-strong hover:text-foreground"
+                    }`}
+                  >
+                    <span className={on ? "font-medium" : ""}>{p.name}</span>
+                    {!on && waited > 0 && (
+                      <span
+                        title={`Sat out ${waited} game${waited > 1 ? "s" : ""}`}
+                        className="rounded bg-amber-100 px-1 font-mono text-[10px] font-semibold text-amber-700"
+                      >
+                        {waited}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         <section className="flex items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 shadow-[var(--shadow-card)]">
           <div>
             <p className="text-sm font-medium">
-              {perTeam > 0 ? `${perTeam}v${perTeam}` : "Not enough yet"}
+              {perTeam > 0
+                ? `${perTeam}v${perTeam}`
+                : "Nobody on the court yet"}
             </p>
             <p className="text-xs text-muted">
               {here.length < 2
-                ? `Tap at least 2 players`
-                : sitCount > 0
-                  ? `${sitCount} sitting, rotating each reshuffle`
-                  : "Everybody plays"}
+                ? "Tap who showed up"
+                : onCourt.length < 2
+                  ? `${here.length} here — pick who's playing`
+                  : sitCount > 0
+                    ? `${sitCount} waiting${onCourt.length % 2 ? " · odd number on court" : ""}`
+                    : "Everybody plays"}
             </p>
           </div>
           <span className="font-mono text-2xl tabular-nums text-muted">
-            {here.length}
+            {onCourt.length}
           </span>
         </section>
 
@@ -312,7 +405,7 @@ export default function RunTab({
 
         <Button
           onClick={() => generate(Math.floor(Math.random() * 1e9))}
-          disabled={here.length < teamCount}
+          disabled={onCourt.length < teamCount}
           className="w-full py-4 text-base"
         >
           {result ? "Regenerate" : "Generate teams"}
@@ -325,7 +418,9 @@ export default function RunTab({
             <p className="text-sm text-muted">
               {here.length < 2
                 ? "Tap who showed up to get started."
-                : `${here.length} in. Hit generate.`}
+                : onCourt.length < 2
+                  ? "Now pick who's on the court."
+                  : `${perTeam}v${perTeam} ready. Hit generate.`}
             </p>
           </div>
         )}
