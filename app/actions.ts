@@ -2,6 +2,7 @@
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
 import { players, profiles, runs } from "@/db/schema";
 import {
@@ -63,6 +64,8 @@ export type SavePlayerInput = {
 };
 
 export async function savePlayer(input: SavePlayerInput) {
+  await assertCanEdit();
+
   if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
   const sport = input.sport;
   const config = SPORTS[sport];
@@ -113,6 +116,8 @@ export async function savePlayer(input: SavePlayerInput) {
 
 /** Removes the player from this sport, and entirely if they play no others. */
 export async function removePlayer(playerId: string, sport: string) {
+  await assertCanEdit();
+
   if (!isSportId(sport)) throw new Error(`Unknown sport: ${sport}`);
   const db = getDb();
 
@@ -163,4 +168,20 @@ export async function getRun(id: string) {
   const db = getDb();
   const [row] = await db.select().from(runs).where(eq(runs.id, id)).limit(1);
   return row ?? null;
+}
+
+export type EditAccess = { gated: boolean; unlocked: boolean };
+
+export async function getEditAccess(): Promise<EditAccess> {
+  return { gated: editingIsGated(), unlocked: await canEdit() };
+}
+
+export async function unlockEditing(passcode: string): Promise<boolean> {
+  const { grantEditing } = await import("@/lib/edit-auth");
+  return grantEditing(passcode);
+}
+
+export async function lockEditing(): Promise<void> {
+  const { revokeEditing } = await import("@/lib/edit-auth");
+  await revokeEditing();
 }

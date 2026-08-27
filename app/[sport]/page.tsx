@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getRoster } from "@/app/actions";
+import { getEditAccess, getRoster } from "@/app/actions";
 import SportApp from "@/components/SportApp";
 import { SPORTS, SPORT_IDS, isSportId } from "@/lib/sports";
 import type { RosterEntry } from "@/app/actions";
@@ -44,5 +44,7 @@ export default async function SportPage({ params }: PageProps<"/[sport]">) {
     );
   }
 
-  return <SportApp config={config} initialRoster={roster} />;
+  const access = await getEditAccess();
+
+  return <SportApp config={config} initialRoster={roster} access={access} />;
 }

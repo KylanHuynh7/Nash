@@ -23,6 +23,11 @@ import type { BalancePlayer } from "@/lib/balance";
 export type Board = {
   teams: BalancePlayer[][];
   bench: BalancePlayer[];
+  /**
+   * Players whose spot was chosen by hand. Automatic placement never moves
+   * them again — a drag is an instruction, not a suggestion.
+   */
+  pinned: string[];
 };
 
 const BENCH = "bench";
@@ -70,14 +75,20 @@ function move(board: Board, playerId: string, to: string): Board {
     );
   }
 
-  return { teams, bench };
+  return { teams, bench, pinned: board.pinned.filter((id) => id !== playerId) };
 }
 
 /** Re-labels a player's position, leaving their team membership alone. */
 function reposition(board: Board, playerId: string, position: string): Board {
   const apply = (list: BalancePlayer[]) =>
     list.map((p) => (p.id === playerId ? { ...p, position } : p));
-  return { teams: board.teams.map(apply), bench: apply(board.bench) };
+  return {
+    teams: board.teams.map(apply),
+    bench: apply(board.bench),
+    pinned: board.pinned.includes(playerId)
+      ? board.pinned
+      : [...board.pinned, playerId],
+  };
 }
 
 export default function TeamBoard({
@@ -141,7 +152,7 @@ export default function TeamBoard({
     >
       {view === "court" ? (
         <CourtView
-          matchups={buildMatchups(config, board.teams)}
+          matchups={buildMatchups(config, board.teams, board.pinned)}
           teamCount={board.teams.length}
         />
       ) : (

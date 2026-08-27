@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { removePlayer, savePlayer, type RosterEntry } from "@/app/actions";
+import PasscodeGate from "@/components/PasscodeGate";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
 import { Button, EmptyState, Rating } from "@/components/ui";
@@ -13,13 +14,24 @@ type Tab = "run" | "roster";
 export default function SportApp({
   config,
   initialRoster,
+  access,
 }: {
   config: SportConfig;
   initialRoster: RosterEntry[];
+  access: { gated: boolean; unlocked: boolean };
 }) {
   const [tab, setTab] = useState<Tab>("run");
   const [roster, setRoster] = useState(initialRoster);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
+  const [unlocked, setUnlocked] = useState(!access.gated || access.unlocked);
+  /** Held while the passcode is asked for, then opened once it's accepted. */
+  const [afterUnlock, setAfterUnlock] = useState<EditorTarget | null>(null);
+
+  /** Editing is gated, so route every entry point through the same check. */
+  function requestEdit(target: EditorTarget) {
+    if (unlocked) setEditor(target);
+    else setAfterUnlock(target);
+  }
   const [pending, startTransition] = useTransition();
 
   function handleSave(input: {
@@ -80,7 +92,7 @@ export default function SportApp({
         </div>
         <Button
           variant="ghost"
-          onClick={() => setEditor({ mode: "new" })}
+          onClick={() => requestEdit({ mode: "new" })}
           className="!px-3 !py-2"
         >
           + Player
@@ -117,13 +129,24 @@ export default function SportApp({
         <RunTab
           config={config}
           roster={roster}
-          onAddPlayer={() => setEditor({ mode: "new" })}
+          onAddPlayer={() => requestEdit({ mode: "new" })}
         />
       ) : (
         <RosterList
           config={config}
           roster={roster}
-          onEdit={(p) => setEditor({ mode: "edit", player: p })}
+          onEdit={(p) => requestEdit({ mode: "edit", player: p })}
+        />
+      )}
+
+      {afterUnlock && (
+        <PasscodeGate
+          onClose={() => setAfterUnlock(null)}
+          onUnlocked={() => {
+            setUnlocked(true);
+            setEditor(afterUnlock);
+            setAfterUnlock(null);
+          }}
         />
       )}
 

@@ -160,6 +160,7 @@ export default function RunTab({
     setBoard({
       teams: next.teams.map((t) => t.players),
       bench: benched,
+      pinned: [],
     });
     setEdited(false);
     setSeed(nextSeed);
@@ -462,6 +463,7 @@ export default function RunTab({
                       setBoard({
                         teams: result.teams.map((t) => t.players),
                         bench: sitting,
+                        pinned: [],
                       });
                       setEdited(false);
                     }}

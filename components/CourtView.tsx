@@ -41,7 +41,9 @@ const SIZE_ORDER = ["c", "pf", "sf", "sg", "pg"] as const;
 export function buildMatchups(
   config: SportConfig,
   teams: BalancePlayer[][],
+  pinned: string[] = [],
 ): Matchup[] {
+  const isPinned = new Set(pinned);
   const order = config.positions.filter((p) => SPOTS[p.key]);
   const slots: Matchup[] = order.map((p) => ({
     position: p.key,
@@ -52,7 +54,14 @@ export function buildMatchups(
 
   teams.forEach((roster, teamIndex) => {
     const leftover: BalancePlayer[] = [];
-    for (const player of roster) {
+
+    // Hand-placed players claim their spot before anyone else can take it.
+    const order = [
+      ...roster.filter((p) => isPinned.has(p.id)),
+      ...roster.filter((p) => !isPinned.has(p.id)),
+    ];
+
+    for (const player of order) {
       const slot = slots.find(
         (s) => s.position === player.position && s.players[teamIndex] === null,
       );
@@ -73,7 +82,7 @@ export function buildMatchups(
       if (slot) slot.players[teamIndex] = player;
     });
 
-    settleByHeight(slots, teamIndex);
+    settleByHeight(slots, teamIndex, isPinned);
   });
 
   return slots;
@@ -90,7 +99,11 @@ export function buildMatchups(
  */
 const HEIGHT_TOLERANCE = 3;
 
-function settleByHeight(slots: Matchup[], teamIndex: number) {
+function settleByHeight(
+  slots: Matchup[],
+  teamIndex: number,
+  pinned: Set<string>,
+) {
   const bySize = SIZE_ORDER.map((key) =>
     slots.find((s) => s.position === key),
   ).filter((s): s is Matchup => Boolean(s));
@@ -104,6 +117,8 @@ function settleByHeight(slots: Matchup[], teamIndex: number) {
         const bigger = bySize[i].players[teamIndex];
         const smaller = bySize[j].players[teamIndex];
         if (!bigger || !smaller) continue;
+        // A spot someone chose by hand is not up for rearranging.
+        if (pinned.has(bigger.id) || pinned.has(smaller.id)) continue;
         if (height(smaller) - height(bigger) > HEIGHT_TOLERANCE) {
           bySize[i].players[teamIndex] = smaller;
           bySize[j].players[teamIndex] = bigger;
