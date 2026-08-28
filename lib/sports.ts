@@ -126,6 +126,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
   },
   football: {
     id: "football",
+    comingSoon: true,
     label: "Football",
     emoji: "\u{1F3C8}",
     defaultTeams: 2,
