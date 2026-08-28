@@ -15,6 +15,19 @@ export const players = pgTable("players", {
   name: text("name").notNull(),
   /** Approximate height in inches. Sport-independent, so it carries across. */
   heightInches: integer("height_inches"),
+  /**
+   * Secret that identifies this person as the rater in a comparison link.
+   *
+   * Attribution, not authentication: it says whose answers these are, and the
+   * reason it exists is that asking people to say so themselves failed — two of
+   * five raters spent a whole sitting under someone else's name. See
+   * `lib/rater-token.ts`.
+   *
+   * Nullable because the column was added to a live table with rows already in
+   * it. `scripts/rater-links.mts` fills the gaps, and the compare page treats a
+   * missing token as "no link issued yet" rather than as an error.
+   */
+  raterToken: text("rater_token").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

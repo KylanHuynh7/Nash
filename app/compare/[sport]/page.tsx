@@ -2,22 +2,56 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCompareBootstrap } from "@/app/actions";
 import CompareApp from "@/components/CompareApp";
+import CompareLinkGate from "@/components/CompareLinkGate";
+import { resolveRater } from "@/lib/rater";
 import { SPORTS, isSportId, sportChrome } from "@/lib/sports";
 
-export default async function ComparePage({
-  params,
-}: PageProps<"/compare/[sport]">) {
-  const { sport } = await params;
+/**
+ * The comparison collector.
+ *
+ * Identity comes from the `?rater=` token in the link and from nowhere else.
+ * The page used to render a dropdown of names and let people pick their own,
+ * which failed twice out of five sittings — see `lib/rater-token.ts` for what
+ * that cost. There is deliberately no picker to fall back to: keeping one would
+ * leave the hole open for anyone still holding the old link, and the old link
+ * is the one that already went out.
+ */
+export default async function ComparePage(
+  props: PageProps<"/compare/[sport]">,
+) {
+  const { sport } = await props.params;
   if (!isSportId(sport) || SPORTS[sport].comingSoon) notFound();
 
   const config = SPORTS[sport];
+  const chrome = sportChrome(config) as React.CSSProperties;
+  const { rater: token } = await props.searchParams;
 
-  // The rater is only known on the client - it lives in localStorage so a
-  // friend resumes where they left off - so the pool is fetched unfiltered here
-  // and refetched per rater once that is read.
+  // No token at all is the ordinary case for someone reopening the page from
+  // their history, so the gate checks for a remembered link before refusing.
+  if (token === undefined) {
+    return (
+      <div className="flex flex-1 flex-col" style={chrome}>
+        <CompareLinkGate config={config} state="missing" />
+      </div>
+    );
+  }
+
+  const rater = await resolveRater(token);
+  if (!rater) {
+    return (
+      <div className="flex flex-1 flex-col" style={chrome}>
+        <CompareLinkGate config={config} state="invalid" />
+      </div>
+    );
+  }
+
+  // The rater is known before the first byte is rendered, so their answered
+  // pairs come down with the page. This used to be a second round trip: the
+  // name lived in localStorage, so the server had to render unfiltered and the
+  // client refetched once it could read who was asking.
   let bootstrap;
   try {
-    bootstrap = await getCompareBootstrap(sport, null);
+    bootstrap = await getCompareBootstrap(sport, rater.id);
   } catch {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-5 py-16">
@@ -34,11 +68,13 @@ export default async function ComparePage({
   if (bootstrap.pool.length < 3) notFound();
 
   return (
-    <div
-      className="flex flex-1 flex-col"
-      style={sportChrome(config) as React.CSSProperties}
-    >
-      <CompareApp config={config} bootstrap={bootstrap} />
+    <div className="flex flex-1 flex-col" style={chrome}>
+      <CompareApp
+        config={config}
+        bootstrap={bootstrap}
+        rater={rater}
+        token={String(token)}
+      />
     </div>
   );
 }
