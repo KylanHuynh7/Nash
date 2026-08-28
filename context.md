@@ -559,6 +559,11 @@ npx dotenv -e .env.local -- npx tsx scripts/draft-sheet.mts basketball > draft-s
 # Demo roster helpers (still .mjs, basketball-only)
 npx dotenv -e .env.local -- node scripts/seed.mjs [--clear]
 
+# Delete one sitting's comparisons — a rushed run-through, or a demo.
+# Scoped to one session on purpose; there is no "delete all" by design,
+# because every environment shares one DATABASE_URL.
+npx dotenv -e .env.local -- npx tsx scripts/drop-session.mts 7larewtl
+
 # Fit Bradley-Terry to the collected comparisons and propose overalls.
 # Writes nothing — it prints, a person applies.
 npx dotenv -e .env.local -- npx tsx scripts/fit-bt.mts basketball
@@ -608,31 +613,83 @@ database: local dev writes are what everyone sees live.
 
 ### 0. Where the last session left off — start here
 
-**Crowd-sourced ratings are built and tap-to-swap shipped.** Neither is
-committed yet; the dev server was stopped and `npm run build` passes clean.
+**Crowd-sourced ratings and tap-to-swap are built, committed (`4c42dfe`), and
+live in production.** `npm run build` and `eslint` are clean.
 
-The one thing that matters now is **not code**: send
-`https://nash-teams.vercel.app/compare/basketball` to the four friends who will
-answer. Everything downstream — whether any rating actually moves, whether the
-group agrees with each other more than with the stored numbers — is gated on
-real answers existing. The pipeline is verified end to end against four
-simulated raters (240 comparisons), and it recovered injected biases of −8, −5
-and +6 as −8, −4 and +4; the attenuation is the ridge shrinkage working.
+#### Do this first: delete three fake rows
 
-Read before touching anything:
+The `comparisons` table holds **three rows recorded under Kylan's name that are
+not his opinions** — they are clicks from browser testing on 2026-08-28. They
+must go before anyone rates, because a pair marked answered is a pair that
+rater is never asked again.
 
-1. **Why ML cannot fix this on its own** — see *Crowd-sourced overalls*. The
-   bias is in the labels. A model trained on the stored ratings relearns it.
-2. **PCA says the six attributes carry ~1.8 dimensions** — see *How ratings
-   work*. It scoped the collector to one axis and it may itself be evidence of
-   halo bias.
-3. **Football is positionless and QB is not a position** — see *The football
-   position model*. Reworked twice; the reasoning matters more than the code.
-4. **The sport backdrop is brushed silver**, and now takes a `veil` prop.
+```bash
+npx dotenv -e .env.local -- npx tsx scripts/drop-session.mts 7larewtl
+```
 
-Deploy note: nothing here needs a new env var, but the `comparisons` table was
-created directly against the shared database, so **it already exists in
-production** — all environments share one `DATABASE_URL`.
+Expect three rows: Orion vs Victor, Brendan vs Taha, Joe vs Eric. After that the
+table should be empty. *(The agent could not run this — deletes against the
+database are blocked by the permission classifier.)*
+
+#### Then: send the link
+
+**https://nash-teams.vercel.app/compare/basketball** — to four or five people.
+Football is at `/compare/football` and works, but send one axis at a time.
+
+Nothing downstream can be evaluated until real answers exist. The pipeline is
+verified end to end against four simulated raters (240 comparisons): injected
+biases of −8, −5 and +6 came back as −8, −4 and +4, the attenuation being the
+ridge shrinkage working. Those simulated rows were deleted.
+
+#### What this collection is actually for — the goal was re-labelled
+
+**Not** "make the friend group's ratings accurate." That is a dead end: the
+spread is already 0.0, and the top five and bottom five never move no matter
+what. Getting one player from 79 to 71 improves nobody's game.
+
+**It is the first real user test of the public product's onboarding.** The
+hardest problem in the general version is cold start — a new group cannot
+produce attribute ratings, and no stranger will move six sliders fifteen times.
+Pairwise tapping is the only onboarding a new group will finish, so what is
+being measured here is:
+
+- Do people finish 60 taps, or bail at 15?
+- How long does it actually take against the ~4 min estimate?
+- Is inter-rater agreement interpretable at n=4, or is it noise?
+
+If four friends who like you don't finish, no stranger will. **That is the
+finding worth having before building multi-tenancy**, and it costs only the
+sending of a link that is already deployed.
+
+**So do not tune the fit further for this group.** No second axis, no attribute
+refinement, no `throwing` pass. Run `fit-bt.mts` once to confirm it works on
+real data, then move to the general-use plumbing below. Those are friend-group
+depth, and depth is not what the project needs next.
+
+#### Can the rater vote in his own collection?
+
+Yes — pick "Kylan" and it behaves normally; self-comparisons are excluded. Two
+things to know:
+
+- **It partially double-counts him.** His opinion is already the shrinkage prior
+  in `fit-bt.mts`, so adding him as a rater counts him twice. Either drop his
+  rater rows before fitting, or lower `--lambda` to weaken the prior.
+- **It produces a genuinely interesting number.** The fit's "vs current" column
+  for him is a **test-retest reliability** check: how often his four-second gut
+  disagrees with his own stored ratings. A high disagreement rate would put a
+  ceiling on how meaningful the stored ratings are at all — a more important
+  finding than any individual rating change.
+
+#### Deployment gotcha found this session
+
+**The Vercel project is not connected to GitHub.** Every deployment in the
+history was made from the CLI. `git push` deploys *nothing* — production sat on
+a five-minute 404 until `vercel deploy --prod` was run by hand. Either keep
+deploying manually or connect the repo in the Vercel dashboard once.
+
+The `comparisons` table already existed in production before the code shipped,
+because all environments share one `DATABASE_URL`. That is also why
+`drop-session.mts` has no unscoped delete.
 
 Still open and deliberately untouched:
 
@@ -643,17 +700,50 @@ Still open and deliberately untouched:
 
 ### Longer term: this is meant to generalise
 
-The aim is a public app any group can use, not one friend group's tool. Nothing
-built here blocks that, and the collector actually **helps**: the current
-onboarding asks one person to rate fifteen people on six attributes, which no
-new group will ever do. Tapping "who's better" for three minutes each is an
-onboarding a group will actually complete, and it produces overalls with no
-expert rater at all — a real answer to the cold-start problem.
+The aim is a public app any group can use. **The friend group is a testbed and a
+running joke, not the product** — the point of rating these seventeen was to get
+a framework working and to wind people up about their numbers.
 
-What multi-tenancy would still need, none of it started: a group/tenant concept
-(`comparisons.rater_id` currently assumes the rater is on the roster, which
-holds for one group), real accounts instead of a shared passcode, and per-group
-scoping on every query.
+**The collector is the general-use path, not a detour from it.** Current
+onboarding asks one person to rate fifteen people across six attributes; no new
+group will ever do that. Three minutes of "who's better" is an onboarding a
+group actually completes, and it produces overalls with **no expert rater at
+all**. That is a real answer to cold start, and it is why the de-biasing work
+and the generalisation work are the same work right now.
+
+#### The inversion
+
+Today: **attributes are primary**, overall is derived from them.
+Public: **overall is primary** (crowd-fitted), attributes become optional —
+added later by groups that care, only to drive position placement and
+`throwing`. PCA says the six attributes carry ~1.8 dimensions between them, so
+little is lost by not asking for them up front.
+
+#### What onboarding looks like
+
+1. One person creates a group and types in names. Two minutes, unavoidable.
+2. Shares the invite link. Everyone taps for three minutes.
+3. Overalls come out of Bradley-Terry. **No rating session ever happens.**
+
+The invite link *is* the product loop: create, share, tap, teams exist.
+
+#### Known work, none of it started
+
+- **A groups/tenant concept.** `comparisons.rater_id` references `players` and
+  assumes the rater is on the roster — true for one group, false for a public
+  app. Every query needs per-group scoping.
+- **Real accounts**, replacing the single shared `EDIT_PASSCODE`.
+- **Cold-start pair selection.** `informativeness()` in `lib/compare.ts` reads
+  current overalls to find close pairs. A brand-new group has none, so the first
+  pass must fall back to uniform-plus-coverage and only go adaptive once
+  estimates form. Small change, but it will surprise whoever hits it.
+- **Mapping BT output onto 65–99 without a prior.** `fit-bt.mts` currently
+  centres on the existing mean overall; a new group has no mean to centre on, so
+  the latent scale needs a rank- or quantile-based map instead.
+
+**The trap to avoid:** building groups, accounts and scoping for a flow nobody
+has ever completed. Watch the friend group finish (or not) first — that is what
+§0 is for.
 
 ### 1. Football — where it stands
 
@@ -903,6 +993,12 @@ The material already exists.
   Recording them would be noise wearing the costume of evidence.
 - **The fit proposes; a person applies.** A model that edits the roster on its
   own is a model nobody checks.
+- **The friend group is a testbed, not the product.** Chasing rating accuracy
+  for these seventeen is a dead end — the spread is already 0.0 and the ends of
+  the ladder never move. The collection's value is proving the *onboarding*
+  works, because that is the public app's hardest problem.
+- **Deploys are manual.** The Vercel project is not connected to GitHub; a push
+  ships nothing.
 - **Red and black belong to basketball**, green to football, white-blue-red to
   Nash itself. A sport's palette is derived from its accent, never hardcoded.
 - **The landing plane leans one way (`\`) and no white is ever drawn into it.**
