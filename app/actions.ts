@@ -1,10 +1,10 @@
 "use server";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
-import { players, profiles, runs } from "@/db/schema";
+import { comparisons, players, profiles, runs } from "@/db/schema";
 import {
   RATING_MAX,
   RATING_MIN,
@@ -184,4 +184,138 @@ export async function unlockEditing(passcode: string): Promise<boolean> {
 export async function lockEditing(): Promise<void> {
   const { revokeEditing } = await import("@/lib/edit-auth");
   await revokeEditing();
+}
+
+/* ------------------------------------------------------------------ *
+ * Pairwise comparisons
+ *
+ * The collector is deliberately ungated. A passcode on the one page that
+ * gathers other people's opinions would defeat its purpose - the whole value
+ * is in answers that did not come from the person holding the passcode.
+ * ------------------------------------------------------------------ */
+
+export type CompareBootstrap = {
+  pool: { id: string; name: string; overall: number }[];
+  /** Pair keys this rater has already answered, so a sitting resumes cleanly. */
+  answered: string[];
+  seen: Record<string, number>;
+};
+
+export async function getCompareBootstrap(
+  sport: SportId,
+  raterId: string | null,
+  axis = "overall",
+): Promise<CompareBootstrap> {
+  const db = getDb();
+  const pool = await db
+    .select({
+      id: players.id,
+      name: players.name,
+      overall: profiles.overall,
+    })
+    .from(profiles)
+    .innerJoin(players, eq(players.id, profiles.playerId))
+    .where(eq(profiles.sport, sport))
+    .orderBy(asc(players.name));
+
+  if (!raterId) return { pool, answered: [], seen: {} };
+
+  const rows = await db
+    .select({
+      pairKey: comparisons.pairKey,
+      leftId: comparisons.leftId,
+      rightId: comparisons.rightId,
+    })
+    .from(comparisons)
+    .where(
+      and(
+        eq(comparisons.sport, sport),
+        eq(comparisons.axis, axis),
+        eq(comparisons.raterId, raterId),
+      ),
+    );
+
+  const seen: Record<string, number> = {};
+  for (const row of rows) {
+    seen[row.leftId] = (seen[row.leftId] ?? 0) + 1;
+    seen[row.rightId] = (seen[row.rightId] ?? 0) + 1;
+  }
+  return { pool, answered: rows.map((r) => r.pairKey), seen };
+}
+
+export async function submitComparison(input: {
+  sport: string;
+  axis?: string;
+  raterId: string;
+  sessionId: string;
+  leftId: string;
+  rightId: string;
+  /** Null is a real answer - "no idea" says the two are close. */
+  winnerId: string | null;
+}) {
+  if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
+  if (input.leftId === input.rightId) throw new Error("A pair needs two people");
+
+  // A rater judging themselves is the one comparison guaranteed to be biased,
+  // so it is refused here as well as filtered in the picker - the action is a
+  // public endpoint and the client is not the only way in.
+  if (input.raterId === input.leftId || input.raterId === input.rightId) {
+    throw new Error("A rater cannot be in their own comparison");
+  }
+  if (
+    input.winnerId !== null &&
+    input.winnerId !== input.leftId &&
+    input.winnerId !== input.rightId
+  ) {
+    throw new Error("The winner has to be one of the pair");
+  }
+
+  const db = getDb();
+  await db
+    .insert(comparisons)
+    .values({
+      sport: input.sport,
+      axis: input.axis ?? "overall",
+      raterId: input.raterId,
+      sessionId: input.sessionId,
+      leftId: input.leftId,
+      rightId: input.rightId,
+      winnerId: input.winnerId,
+      pairKey: pairKeyOf(input.leftId, input.rightId),
+    })
+    // Re-answering a pair keeps the first answer rather than erroring. A
+    // second tap on a flaky connection is not a changed opinion.
+    .onConflictDoNothing();
+}
+
+function pairKeyOf(a: string, b: string): string {
+  return a < b ? `${a}:${b}` : `${b}:${a}`;
+}
+
+export type CompareProgress = {
+  totalAnswers: number;
+  raters: { id: string; name: string; answers: number }[];
+};
+
+export async function getCompareProgress(
+  sport: SportId,
+  axis = "overall",
+): Promise<CompareProgress> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: players.id,
+      name: players.name,
+      answers: sql<number>`count(*)::int`,
+    })
+    .from(comparisons)
+    .innerJoin(players, eq(players.id, comparisons.raterId))
+    .where(and(eq(comparisons.sport, sport), eq(comparisons.axis, axis)))
+    .groupBy(players.id, players.name)
+    .orderBy(desc(sql`count(*)`));
+
+  return {
+    totalAnswers: rows.reduce((sum, r) => sum + r.answers, 0),
+    raters: rows,
+  };
 }

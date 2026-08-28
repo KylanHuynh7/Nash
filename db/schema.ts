@@ -76,6 +76,73 @@ export const runs = pgTable(
   (table) => [index("runs_sport_idx").on(table.sport)],
 );
 
+/**
+ * One pairwise judgement: "who'd you rather have, A or B?"
+ *
+ * The point of this table is that it is the only rating signal in the app that
+ * did not come from one person. Overalls are a weighted mean of attributes that
+ * a single rater assigned, so every number downstream of them inherits that
+ * rater's bias. A pairwise comparison is a question people can answer
+ * accurately without a calibrated scale, and collecting it from the whole group
+ * turns one opinion into a consensus.
+ *
+ * Three things are stored that the naive version would drop, and each one buys
+ * a bias correction later:
+ *
+ * - `raterId` — so a rater's own comparisons can be excluded (self-assessment
+ *   in a friend group is large and one-directional) and so a careless or
+ *   self-favouring rater can be found by their disagreement with the consensus.
+ * - `leftId`/`rightId` as *presented*, with `winnerId` naming one of them. Side
+ *   preference is a real effect; keeping the presented order means it can be
+ *   measured rather than assumed absent.
+ * - `pairKey` — sorted ids, unique per rater and axis, so nobody's opinion on
+ *   the same pair is counted twice.
+ */
+export const comparisons = pgTable(
+  "comparisons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sport: text("sport").notNull(),
+    /**
+     * Which question was asked. "overall" is "who'd you rather have". The
+     * column exists because the attributes are highly correlated - one axis
+     * carries most of the signal - so extra axes are worth adding only for the
+     * genuinely independent ones, and only once people finish the first pass.
+     */
+    axis: text("axis").notNull().default("overall"),
+    raterId: uuid("rater_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Groups one sitting, so a rushed run-through can be spotted and dropped. */
+    sessionId: text("session_id").notNull(),
+    leftId: uuid("left_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    rightId: uuid("right_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Null means "no idea" - kept, because it is evidence the two are close. */
+    winnerId: uuid("winner_id").references(() => players.id, {
+      onDelete: "cascade",
+    }),
+    /** The two ids sorted and joined, so the unique index is order-free. */
+    pairKey: text("pair_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("comparisons_rater_pair_unique").on(
+      table.raterId,
+      table.sport,
+      table.axis,
+      table.pairKey,
+    ),
+    index("comparisons_sport_axis_idx").on(table.sport, table.axis),
+  ],
+);
+
 export type Player = typeof players.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type Run = typeof runs.$inferSelect;
+export type Comparison = typeof comparisons.$inferSelect;

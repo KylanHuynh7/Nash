@@ -7,14 +7,35 @@ import type { Matchup } from "@/lib/lineup";
 import type { BalancePlayer } from "@/lib/balance";
 import type { SportConfig } from "@/lib/sports";
 
+/**
+ * Tap-to-swap state, threaded down to each slot.
+ *
+ * Dragging is the wrong instrument on the surface this actually gets used on.
+ * A thumb on a phone has to press and hold for 180ms, keep contact while the
+ * board scrolls under it, and land inside a 7rem card. Two taps do the same job
+ * with none of that, so both inputs drive the same reducer.
+ */
+export type SwapState = {
+  /** The player waiting for somewhere to go, or null. */
+  selectedId: string | null;
+  /** Which team he is on, so only his own side lights up. */
+  selectedTeam: number | null;
+  onSelect: (playerId: string | null, teamIndex: number) => void;
+  /** Fires with the spot key tapped, on the selected player's own team. */
+  onSwap: (spot: string) => void;
+};
+
 export default function CourtView({
   matchups,
   teamCount,
   config,
+  swap,
 }: {
   matchups: Matchup[];
   teamCount: number;
   config: SportConfig;
+  /** Absent on the share page, which is read-only and has no board to mutate. */
+  swap?: SwapState;
 }) {
   const spots = new Map(config.spots.map((s) => [s.key, s]));
   return (
@@ -30,7 +51,7 @@ export default function CourtView({
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
             >
-              <MatchupCard matchup={m} teamCount={teamCount} />
+              <MatchupCard matchup={m} teamCount={teamCount} swap={swap} />
             </div>
           );
         })}
@@ -182,9 +203,11 @@ function FieldMarkings() {
 function MatchupCard({
   matchup,
   teamCount,
+  swap,
 }: {
   matchup: Matchup;
   teamCount: number;
+  swap?: SwapState;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `spot-${matchup.position}`,
@@ -223,6 +246,8 @@ function MatchupCard({
             player={player}
             teamIndex={i}
             delta={lead && lead.index === i ? lead.delta : null}
+            spot={matchup.position}
+            swap={swap}
           />
         ))}
       </div>
@@ -238,14 +263,46 @@ function PlayerSlot({
   player,
   teamIndex,
   delta,
+  spot,
+  swap,
 }: {
   player: BalancePlayer | null;
   teamIndex: number;
   delta: number | null;
+  spot: string;
+  swap?: SwapState;
 }) {
   const color = teamColor(teamIndex);
 
+  const selected = Boolean(swap && swap.selectedId === player?.id);
+  // Only the selected player's own side lights up. A swap across teams changes
+  // who is on which side, which `pinToSpot` does not do and should not pretend
+  // to - it rearranges one lineup.
+  const targetable = Boolean(
+    swap &&
+      swap.selectedId &&
+      swap.selectedTeam === teamIndex &&
+      !selected,
+  );
+
   if (!player) {
+    // An empty slot is a real destination: moving into it leaves nobody
+    // displaced. It only accepts taps while it is a live target.
+    if (targetable) {
+      return (
+        <button
+          type="button"
+          onClick={() => swap?.onSwap(spot)}
+          className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-xs text-accent outline-1 outline-dashed outline-accent/70 transition hover:bg-accent-wash"
+        >
+          <span
+            aria-hidden
+            className={`h-1.5 w-1.5 rounded-full ${color.dot} opacity-60`}
+          />
+          <span className="italic">move here</span>
+        </button>
+      );
+    }
     return (
       <div className="flex items-center gap-1.5 rounded-md px-1 py-1 text-xs text-muted">
         <span
@@ -258,7 +315,15 @@ function PlayerSlot({
   }
 
   return (
-    <DraggablePlayer player={player} teamIndex={teamIndex} delta={delta} />
+    <DraggablePlayer
+      player={player}
+      teamIndex={teamIndex}
+      delta={delta}
+      spot={spot}
+      swap={swap}
+      selected={selected}
+      targetable={targetable}
+    />
   );
 }
 
@@ -266,25 +331,65 @@ function DraggablePlayer({
   player,
   teamIndex,
   delta,
+  spot,
+  swap,
+  selected,
+  targetable,
 }: {
   player: BalancePlayer;
   teamIndex: number;
   delta: number | null;
+  spot: string;
+  swap?: SwapState;
+  selected: boolean;
+  targetable: boolean;
 }) {
   const color = teamColor(teamIndex);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
   });
 
+  // dnd-kit's sensors need 8px of travel or a 180ms hold before a drag starts,
+  // and it suppresses the click that would otherwise follow one - so a tap and
+  // a drag can share the element without a tap ever firing at the end of a drag.
+  function handleClick() {
+    if (!swap) return;
+    if (targetable) swap.onSwap(spot);
+    else if (selected) swap.onSelect(null, teamIndex);
+    else swap.onSelect(player.id, teamIndex);
+  }
+
+  // The selected player and his destinations both need to stand out from the
+  // board, but they are two different things and looked like one at the same
+  // ring weight. The one that was picked is filled; the ones that can be tapped
+  // are only outlined, and dashed so the difference survives a glance.
+  const state = selected
+    ? "bg-accent-wash ring-2 ring-accent font-semibold"
+    : targetable
+      ? "outline-1 outline-dashed outline-accent/70 hover:bg-accent-wash"
+      : "hover:bg-sunken";
+
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
+      role={swap ? "button" : undefined}
+      tabIndex={swap ? 0 : undefined}
+      aria-pressed={swap ? selected : undefined}
+      onKeyDown={
+        swap
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleClick();
+              }
+            }
+          : undefined
+      }
       className={`flex touch-none items-center gap-1.5 rounded-md px-1 py-1 text-xs transition ${
-        isDragging
-          ? "opacity-30"
-          : "cursor-grab hover:bg-sunken active:cursor-grabbing"
+        isDragging ? "opacity-30" : `cursor-grab active:cursor-grabbing ${state}`
       }`}
     >
       <span

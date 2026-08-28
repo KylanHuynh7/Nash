@@ -152,6 +152,8 @@ export default function SportApp({
         ))}
       </div>
 
+      {tab === "roster" && roster.length > 0 && <CompareInvite config={config} />}
+
       {tab === "run" ? (
         <RunTab
           config={config}
@@ -195,6 +197,35 @@ export default function SportApp({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The way into the comparison collector.
+ *
+ * It sits on the roster tab rather than in the nav because that is where
+ * someone is already looking at the ratings and, occasionally, disagreeing with
+ * one. The link is the answer to that disagreement.
+ */
+function CompareInvite({ config }: { config: SportConfig }) {
+  return (
+    <Link
+      href={`/compare/${config.id}`}
+      className="mb-4 flex items-center gap-3 rounded-xl border border-accent-line bg-accent-wash px-4 py-3 transition hover:border-accent"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-foreground">
+          Think a rating is wrong?
+        </span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+          These come from one person. Answer a minute of &ldquo;who&apos;s
+          better&rdquo; and the group decides instead.
+        </span>
+      </span>
+      <span aria-hidden className="text-muted">
+        →
+      </span>
+    </Link>
   );
 }
 

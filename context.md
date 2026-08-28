@@ -50,7 +50,9 @@ app/
   page.tsx            Landing: shield-palette shard collage, sport tiles
   [sport]/page.tsx    Server shell; loads roster + edit access
   run/[id]/page.tsx   Shared run (server component, no client bundle)
-  actions.ts          Server actions: roster, save/remove, runs, passcode
+  compare/[sport]/    Pairwise comparison collector — ungated, public
+  actions.ts          Server actions: roster, save/remove, runs, passcode,
+                      comparisons
   globals.css         Root tokens, .figure/.metal/.eyebrow/.cut helpers
 components/
   SportApp.tsx        Tabs, roster list, editor/card orchestration, sport chrome
@@ -60,12 +62,14 @@ components/
   PlayerCard.tsx      Read-only ratings view (no passcode)
   PlayerEditor.tsx    Sliders, gated behind the passcode
   PasscodeGate.tsx    Unlock sheet
+  CompareApp.tsx      The "who's better?" collector
   ShardField.tsx      Landing-page SVG backdrop
   ui.tsx              Rating, ratingTone, ratingBar, TEAM_COLORS, Button
 lib/
   sports.ts           SPORTS config, computeOverall, sportChrome
   lineup.ts           buildMatchups + height settling (pure, server-safe)
   balance.ts          The balancer
+  compare.ts          Pair selection: anchors, informativeness, coverage (pure)
   edit-auth.ts        Server-side passcode check
 scripts/              .mts, sport-aware — see Scripts below
 db/                   Drizzle schema + client
@@ -88,6 +92,11 @@ Three tables. The split matters: **a person is not a sport profile.**
 - **`runs`** — saved matchups behind a short share link. Teams are stored as a
   **snapshot**, not as references, so an old link keeps showing the ratings the
   teams were actually built from.
+- **`comparisons`** — one pairwise judgement each: "who'd you rather have, A or
+  B?", with the rater, the presented left/right order, and the winner (null for
+  "too close to call"). Unique on `(rater, sport, axis, pair_key)` where
+  `pair_key` is the two ids sorted, so nobody is counted twice on a pair. This
+  is the **only rating signal in the app that did not come from one person.**
 
 ---
 
@@ -151,6 +160,29 @@ measured three times, and they carry ~48% of the weight. Rebounding is the most
 defense, athleticism — not the weights and not the overall.** A disagreement
 about shooting is mostly redundant with finishing.
 
+**Measured with PCA over the 17x6 matrix** (standardised, correlation-matrix
+eigendecomposition):
+
+```
+variance explained:   73.4%  13.4%  7.4%  4.1%  1.3%  0.4%
+effective dimensions: 1.77 of 6   (participation ratio)
+```
+
+One factor carries **73%**. The six attributes are, statistically, "how good is
+he" plus a faint big-man/guard axis. Two consequences:
+
+- Fitting weights *from data* is hopeless — the design matrix is near-singular,
+  so coefficients would swing on noise. Don't try it.
+- A one-dimensional crowd-sourced strength is a **fair** replacement for the
+  overall, not a lossy one. There are not five dimensions being thrown away.
+
+**The caveat cuts the other way too, and matters.** PCA ran on one person's
+ratings, so it describes the structure of *those judgements* and cannot detect
+their bias. A 0.94 correlation between shooting and finishing might be true of
+basketball, or it might be halo — one rater marking good players high on
+everything. A 73% first component is exactly what halo looks like. If the crowd
+data comes back *less* correlated than this, that is the finding.
+
 ---
 
 ## The roster
@@ -194,6 +226,59 @@ together/apart pairing rules. ~18ms for twelve players.
 
 **Measured: 20 consecutive generations from the 17-man pool all produced a
 spread of 0.0** — identical team averages every time.
+
+### Crowd-sourced overalls (`/compare/[sport]`)
+
+**The problem this exists for:** every overall in the app is a weighted mean of
+six attributes that one person assigned. No amount of modelling fixes that — a
+model trained on those ratings relearns the same bias, because the bias is in
+the labels, not in the aggregation. The only fix is a signal that did not come
+from that person.
+
+**Recording game results was considered and rejected.** The winner-stays-on
+buttons are a *preview* control — people tap them to see the next matchup before
+walking back on. Recording them would mix real outcomes with speculative taps
+with no way to separate the two, which is worse than no data because it looks
+like evidence. Do not add a `games` table until there is a deliberate
+record-the-result flow that is distinct from those buttons.
+
+**What it does instead:** asks "who'd you rather have, A or B?" and fits
+Bradley-Terry to the answers. Pairwise is the right instrument because nobody
+can produce a calibrated 65–99 number on a scale they didn't build, but everyone
+can pick one of two names, in about four seconds.
+
+Three bias controls, and they matter more than the model:
+
+1. **A rating is never shown during collection.** Names only. Showing the
+   current numbers anchors the answer to the opinion being checked. The current
+   overall *does* steer which pair gets asked (close pairs are informative, wide
+   ones are not) — that is active learning, and it never reaches the rater.
+2. **A rater is never asked about themselves.** Self-assessment in a friend
+   group is large and one-directional. Filtered in the picker *and* refused in
+   the server action *and* re-checked in the fit — it is the one filter that
+   must not silently lapse.
+3. **Presented left/right order is stored**, so side preference can be measured
+   rather than assumed absent.
+
+**Anchor pairs.** Every rater is asked the same fixed set first: each player
+against the one directly above him on the current ladder, plus three long-range
+pairs to tie the top of the scale to the bottom. Adjacent pairs are the most
+informative questions available, and asking everyone the same ones is what makes
+**inter-rater agreement** measurable. With four or five raters, random selection
+leaves almost no pair answered twice, and that number is the most valuable
+output of the whole exercise: if the group agrees with each other far more than
+they agree with the stored ratings, the stored ratings are the outlier.
+
+**How many raters.** Four is enough to start and it is the big jump — error from
+one rater to four falls by roughly half (as √n); 4→8 takes off only another 29%.
+Two things four cannot do: correlated bias (everyone sharing a blind spot) never
+averages out at any n, and down-weighting a careless rater needs a consensus to
+measure them against, which wants 6+.
+
+`SESSION_TARGET` is 60, capped at `availablePairs` — football's twelve-man
+roster leaves a rater 55 pairs, and a bar counting to 60 would never fill.
+Progress counts a rater's **lifetime** answers, not the sitting's, so someone
+returning is not told they have done none of it.
 
 ### The three-stage flow
 
@@ -474,6 +559,11 @@ npx dotenv -e .env.local -- npx tsx scripts/draft-sheet.mts basketball > draft-s
 # Demo roster helpers (still .mjs, basketball-only)
 npx dotenv -e .env.local -- node scripts/seed.mjs [--clear]
 
+# Fit Bradley-Terry to the collected comparisons and propose overalls.
+# Writes nothing — it prints, a person applies.
+npx dotenv -e .env.local -- npx tsx scripts/fit-bt.mts basketball
+npx dotenv -e .env.local -- npx tsx scripts/fit-bt.mts football --lambda 2
+
 # Sanity-check the balancer
 npx tsx scripts/balance-check.ts
 ```
@@ -518,28 +608,52 @@ database: local dev writes are what everyone sees live.
 
 ### 0. Where the last session left off — start here
 
-**Deployed, football opened, background rebuilt.** All of it is on `main` and
-live. Three things are worth reading before touching anything:
+**Crowd-sourced ratings are built and tap-to-swap shipped.** Neither is
+committed yet; the dev server was stopped and `npm run build` passes clean.
 
-1. **Football is positionless and QB is not a position** — see *The football
-   position model* below. This was reworked twice in one session and the
-   reasoning matters more than the code.
-2. **The sport backdrop is brushed silver now**, not the dark red wash — see
-   *Sport backdrop* under Design system.
-3. **`throwing` is flat 75 for all twelve football players.** It is the one
-   attribute with no derivation behind it, and until it is set the quarterback
-   spot picks essentially arbitrarily.
+The one thing that matters now is **not code**: send
+`https://nash-teams.vercel.app/compare/basketball` to the four friends who will
+answer. Everything downstream — whether any rating actually moves, whether the
+group agrees with each other more than with the stored numbers — is gated on
+real answers existing. The pipeline is verified end to end against four
+simulated raters (240 comparisons), and it recovered injected biases of −8, −5
+and +6 as −8, −4 and +4; the attenuation is the ridge shrinkage working.
 
-**The next task is football ratings**, and it is no longer blocked. The old
-blocker (Q0, the 1-to-17 draft ladder) applied to the *basketball* method. The
-football roster is twelve, positions are real, and starting numbers exist to
-correct rather than a blank sheet.
+Read before touching anything:
+
+1. **Why ML cannot fix this on its own** — see *Crowd-sourced overalls*. The
+   bias is in the labels. A model trained on the stored ratings relearns it.
+2. **PCA says the six attributes carry ~1.8 dimensions** — see *How ratings
+   work*. It scoped the collector to one axis and it may itself be evidence of
+   halo bias.
+3. **Football is positionless and QB is not a position** — see *The football
+   position model*. Reworked twice; the reasoning matters more than the code.
+4. **The sport backdrop is brushed silver**, and now takes a `veil` prop.
+
+Deploy note: nothing here needs a new env var, but the `comparisons` table was
+created directly against the shared database, so **it already exists in
+production** — all environments share one `DATABASE_URL`.
 
 Still open and deliberately untouched:
 
 - The **wordmark underline** (`app/page.tsx`) still has a hand-set angle.
 - **Football's accent is still the placeholder `#16a34a`.**
-- **Tap-to-swap** (below) — scoped, estimated, not started.
+- **Cross-team and bench tap-swaps** — see §2.
+- **`throwing` is still flat 75 for all twelve football players.**
+
+### Longer term: this is meant to generalise
+
+The aim is a public app any group can use, not one friend group's tool. Nothing
+built here blocks that, and the collector actually **helps**: the current
+onboarding asks one person to rate fifteen people on six attributes, which no
+new group will ever do. Tapping "who's better" for three minutes each is an
+onboarding a group will actually complete, and it produces overalls with no
+expert rater at all — a real answer to the cold-start problem.
+
+What multi-tenancy would still need, none of it started: a group/tenant concept
+(`comparisons.rater_id` currently assumes the rater is on the roster, which
+holds for one group), real accounts instead of a shared passcode, and per-group
+scoping on every query.
 
 ### 1. Football — where it stands
 
@@ -621,40 +735,59 @@ too much for twelve players. Two things bear on it:
   iq, weighted), not a new stored attribute, and it would give the field view
   something honest to show at the QB spot.
 
-### 2. Tap-to-swap (scoped, not started)
+### 2. Tap-to-swap — built (same-team only)
 
-Instead of dragging: tap a player, valid targets highlight, tap one to swap.
-Better than drag on a phone, which is where this gets used.
+Tap a player on the court, his own team's spots outline in dashes, tap one to
+swap. Both inputs drive the same reducer: `pinToSpot` already performed exactly
+this swap for drag, so this is a UI layer over logic that was already written.
 
-**Most of it already exists.** `pinToSpot` (`TeamBoard.tsx:101`) already
-performs the exact swap — pinning a player to an occupied spot pins the
-displaced player back to the origin spot. The work is a UI layer over a reducer
-that is already written and already used by drag.
+- Selected: solid 2px accent ring. Targets: 1px **dashed outline**.
+- **An empty spot is a valid target** ("move here") — nobody is displaced.
+- **Only the selected player's own side lights up.** A cross-team swap changes
+  who is on which side, which `pinToSpot` does not do.
+- Starting a drag clears a pending selection, or the drop lands and the click
+  that follows it swaps a second pair.
+- A selection pointing at a lineup that no longer exists is dropped on every
+  render (`selectionLive` in `TeamBoard.tsx`), so a regenerate can't leave the
+  wrong slot lit.
 
-| Scope | Estimate |
-|---|---|
-| Same-team spot swap | ~30–45 min |
-| Plus cross-team and bench | ~1–1.5 hr — needs a new `swap` reducer; `move` relocates one player and changes team sizes, which is not a swap |
+**Position is not consulted**, matching drag. `context.md` previously said
+targets must be position-aware in football, but that contradicts the standing
+decision that a drag is never blocked by position — and tap and drag doing
+different things on the same elements would be worse than either rule.
 
-**Risk:** tap and drag share the same elements. Sensors use an 8px distance
-threshold and a 180ms touch delay (`TeamBoard.tsx:145`), so a clean tap should
-not start a drag — but this behaves differently under a real thumb than in a
-headless browser. Test on a phone before trusting it.
+**Still not built: cross-team and bench swaps.** Those need a real `swap`
+reducer; `move` relocates one player and changes team sizes, which is not a
+swap. Estimated ~1–1.5 hr.
 
-**Football constraint:** positions are not interchangeable the way basketball's
-are, so valid targets must be position-aware there.
+**Not yet tested under a real thumb.** Sensors use an 8px distance threshold and
+a 180ms touch delay, and dnd-kit suppresses the click that would follow a drag —
+verified in a headless browser, which is not the same as a phone.
 
-### 2b. Collect second opinions
+### 2b. Collect second opinions — superseded by `/compare`
 
-Two-step, and **the order matters**:
+The two-step CSV plan (blind draft sheet, then marked-up ratings CSV) is
+replaced by the comparison collector, which is strictly better on every axis
+that mattered: it is anchor-free by construction, it is three minutes on a phone
+rather than a spreadsheet, and it produces data a model can actually fit.
 
-1. **Blind draft sheet first** — names only. Showing ratings first anchors the
-   answer and contaminates the most valuable feedback available.
-2. **Ratings CSV second** — ask about individual attributes, especially
-   rebounding, defense and athleticism.
+`draft-sheet.mts` and `export-csv.mts` still work and are still the right tools
+for a *targeted* question about one attribute.
 
-Where three people agree against a rating, change it. Where they disagree with
-each other, that player is genuinely ambiguous and the current number is fine.
+**The next action is not code.** Send `/compare/basketball` to the four friends
+who will answer. Nothing downstream can be evaluated until real answers exist,
+and the fit script's own output is what says whether the ratings need to move.
+
+**Football wants this more than basketball, not less.** Its numbers are not even
+judgements — they are a documented transformation of basketball ratings, so they
+have a *weaker* claim to accuracy. `/compare/football` works today.
+
+**`throwing` is the one thing a second axis is genuinely needed for.** It is
+flat 75 for all twelve, it decides who plays quarterback, and it is scored on
+team maxima — so it is load-bearing and contains no information at all. "Who'd
+you rather have throwing the ball?" is the obvious second axis, and the `axis`
+column exists for it. Add it only after the overall pass gets finished; asking
+for two passes up front is how you get neither.
 
 ### 3. Attendance-relative ranking (parked)
 
@@ -716,6 +849,18 @@ The material already exists.
   go into the CSV as **plain inches**.
 - **The sit-out badge was `bg-amber-100` under `text-amber-300`** — cream on
   light amber, a light-theme leftover. Two warning notices had the same problem.
+- **`ring-dashed` is not a Tailwind utility** and failed silently — rings are
+  box-shadows and cannot be dashed. `outline-dashed` is the real one. Same class
+  of trap as `text-[3.75rem]`: verified by reading `getComputedStyle`, not by
+  looking at it.
+- **`drizzle-kit push` offered to truncate `profiles`** to add a unique
+  constraint that was *already present* in the database. The comparisons table
+  was created with explicit SQL instead. Check `pg_constraint` before believing
+  drizzle-kit about drift, and never accept a truncate prompt on this database —
+  local dev writes are production.
+- **The sport backdrop needed a `veil` prop.** 0.55 was tuned against pages full
+  of cards; on the sparse compare page the facets sat bare behind the type. The
+  default is unchanged; `/compare` passes 0.3.
 - **`vercel alias set` does not follow later deploys.** See Deployment.
 
 ---
@@ -744,7 +889,20 @@ The material already exists.
 - **Height lives on the person**, not the sport profile, so it carries across sports.
 - **Saved runs snapshot their teams** so old share links stay truthful as ratings
   change.
-- **Viewing a rating is free; changing one is gated.**
+- **Viewing a rating is free; changing one is gated.** The comparison collector
+  is the deliberate exception: a passcode on the one page that gathers other
+  people's opinions would defeat its whole purpose.
+- **The bias is in the labels, not the aggregation.** No model trained on the
+  stored ratings can remove it. Only an independent signal can, which is what
+  `/compare` collects.
+- **Overalls may become crowd-derived; attributes stay one person's.** Overall
+  is what the balancer uses, so that is the number worth de-biasing. Attributes
+  are descriptive — the player card, position placement, `throwing` for the QB
+  spot — and PCA says they carry ~1.8 dimensions between them anyway.
+- **The preview win buttons are not results.** People tap them speculatively.
+  Recording them would be noise wearing the costume of evidence.
+- **The fit proposes; a person applies.** A model that edits the roster on its
+  own is a model nobody checks.
 - **Red and black belong to basketball**, green to football, white-blue-red to
   Nash itself. A sport's palette is derived from its accent, never hardcoded.
 - **The landing plane leans one way (`\`) and no white is ever drawn into it.**

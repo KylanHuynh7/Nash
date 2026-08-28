@@ -140,6 +140,24 @@ export default function TeamBoard({
 }) {
   const [dragging, setDragging] = useState<BalancePlayer | null>(null);
 
+  /**
+   * Tap-to-swap: who is waiting for somewhere to go.
+   *
+   * Held here rather than in CourtView because a board change has to clear it -
+   * a regenerate wipes the pins, and a selection pointing at a lineup that no
+   * longer exists would light up the wrong slot.
+   */
+  const [selected, setSelected] = useState<{
+    id: string;
+    team: number;
+  } | null>(null);
+
+  // The selected player may have been regenerated away or moved to the bench.
+  const selectionLive =
+    selected !== null &&
+    board.teams[selected.team]?.some((p) => p.id === selected.id);
+  const live = selectionLive ? selected : null;
+
   // A short press-and-hold on touch keeps the page scrollable; on mouse a few
   // pixels of travel distinguishes a drag from a click.
   const sensors = useSensors(
@@ -154,6 +172,9 @@ export default function TeamBoard({
     sizes.length > 1 && Math.max(...sizes) - Math.min(...sizes) > 0;
 
   function handleStart(event: DragStartEvent) {
+    // A drag supersedes a pending tap; leaving both armed means the drop lands
+    // and then the click that follows it swaps a second pair.
+    setSelected(null);
     const all = [...board.teams.flat(), ...board.bench];
     setDragging(all.find((p) => p.id === event.active.id) ?? null);
   }
@@ -183,11 +204,24 @@ export default function TeamBoard({
       onDragEnd={handleEnd}
       onDragCancel={() => setDragging(null)}
     >
+      {view === "court" && <SwapHint active={Boolean(live)} />}
+
       {view === "court" ? (
         <CourtView
           matchups={buildMatchups(config, board.teams, board.pinned)}
           teamCount={board.teams.length}
           config={config}
+          swap={{
+            selectedId: live?.id ?? null,
+            selectedTeam: live?.team ?? null,
+            onSelect: (playerId, teamIndex) =>
+              setSelected(playerId ? { id: playerId, team: teamIndex } : null),
+            onSwap: (spot) => {
+              if (!live) return;
+              onChange(pinToSpot(board, config, live.id, spot));
+              setSelected(null);
+            },
+          }}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -228,6 +262,27 @@ export default function TeamBoard({
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+/**
+ * Says the board is tappable, because nothing else does.
+ *
+ * Dragging at least looks draggable. Two-tap swapping is invisible until
+ * someone happens to tap a player, and the people using this are standing on a
+ * court deciding whether to bother.
+ */
+function SwapHint({ active }: { active: boolean }) {
+  return (
+    <p
+      className={`mb-2 text-center text-xs transition ${
+        active ? "font-medium text-accent-ink" : "text-ink-soft"
+      }`}
+    >
+      {active
+        ? "Now tap where he should go — or tap him again to cancel."
+        : "Tap a player, then tap a spot on his own team to swap them."}
+    </p>
   );
 }
 

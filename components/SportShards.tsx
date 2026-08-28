@@ -202,6 +202,7 @@ function Field({
   sheenSpan,
   sheenRise,
   palette,
+  veil,
 }: {
   shards: Shard[];
   viewBox: string;
@@ -210,6 +211,7 @@ function Field({
   sheenSpan: number;
   sheenRise: number;
   palette: Palette;
+  veil: number;
 }) {
   return (
     <svg
@@ -236,8 +238,13 @@ function Field({
        * its black facets and the page's dark ink cancel each other out and
        * labels like the spread disappear. Held back toward the silver, it still
        * reads as red and black — it just stops competing with type.
+       *
+       * How far back it has to be held depends on how much is in front of it.
+       * A page of cards covers most of the mass; a page with two buttons on it
+       * leaves the facets bare behind the type, and the same 0.55 that reads as
+       * a surface there reads as clutter here. Hence the prop.
        */}
-      <g opacity={0.55}>
+      <g opacity={veil}>
         {shards.map((s, i) => (
           <polygon
             key={i}
@@ -251,7 +258,19 @@ function Field({
   );
 }
 
-export default function SportShards({ accent }: { accent: string }) {
+export default function SportShards({
+  accent,
+  veil = 0.55,
+}: {
+  accent: string;
+  /**
+   * How strongly the shattered mass shows through, 0 to 1.
+   *
+   * The default is tuned for a page full of cards. Turn it down on a sparse
+   * page, where the facets sit bare behind the type instead of behind content.
+   */
+  veil?: number;
+}) {
   const palette = paletteFor(accent);
   return (
     <div
@@ -266,6 +285,7 @@ export default function SportShards({ accent }: { accent: string }) {
           sheenSpan={160}
           sheenRise={100}
           palette={palette}
+          veil={veil}
         />
       </div>
       <div className="h-full w-full sm:hidden">
@@ -275,6 +295,7 @@ export default function SportShards({ accent }: { accent: string }) {
           sheenSpan={100}
           sheenRise={200}
           palette={palette}
+          veil={veil}
         />
       </div>
     </div>
