@@ -5,7 +5,9 @@
  *
  * Flags:
  *   --lambda N   shrinkage toward the existing ratings (default 1.0)
- *   --axis KEY   which question to fit (default "overall")
+ *   --axis KEY   which question to fit (default "overall"). An axis that names
+ *                an attribute fits that attribute: prior, proposal and scale
+ *                are all the attribute's, not the overall's.
  *   --exclude NAME[,NAME]  drop these raters' rows from the fit
  *
  * It writes nothing. The fit proposes, a person applies - a model that edits
@@ -34,7 +36,13 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { comparisons, players, profiles } from "../db/schema";
-import { RATING_MAX, RATING_MIN, isSportId } from "../lib/sports";
+import {
+  RATING_DEFAULT,
+  RATING_MAX,
+  RATING_MIN,
+  SPORTS,
+  isSportId,
+} from "../lib/sports";
 import {
   agreementWithConsensus,
   agreementWithCurrent,
@@ -59,6 +67,25 @@ if (!sport || !isSportId(sport)) {
 }
 
 const axis = flag("axis") ?? "overall";
+/*
+ * What a fit on this axis is actually estimating.
+ *
+ * "overall" proposes `profiles.overall` — the weighted mean of the attributes.
+ * Any other axis names an attribute, and then the attribute's own rating is
+ * both the shrinkage prior and the thing a proposal applies to. Fitting a
+ * throwing pass against the overall as prior would shrink arm strength toward
+ * general football ability, which is precisely the thing it is not.
+ */
+const axisConfig = SPORTS[sport].axes.find((a) => a.key === axis);
+if (!axisConfig) {
+  console.error(
+    `Unknown axis "${axis}" for ${sport}. Configured: ${SPORTS[sport].axes
+      .map((a) => a.key)
+      .join(", ")}`,
+  );
+  process.exit(1);
+}
+const attribute = axisConfig.attribute;
 const lambda = Number(flag("lambda") ?? 1);
 /*
  * Raters to leave out of the fit.
@@ -79,15 +106,22 @@ const excluded = (flag("exclude") ?? "")
 
 const db = getDb();
 
-const roster = await db
+const rosterRows = await db
   .select({
     id: players.id,
     name: players.name,
     overall: profiles.overall,
+    ratings: profiles.ratings,
   })
   .from(profiles)
   .innerJoin(players, eq(players.id, profiles.playerId))
   .where(eq(profiles.sport, sport));
+
+const roster = rosterRows.map((p) => ({
+  id: p.id,
+  name: p.name,
+  current: attribute ? (p.ratings[attribute] ?? RATING_DEFAULT) : p.overall,
+}));
 
 const rows = await db
   .select({
@@ -153,7 +187,7 @@ for (const row of clean) {
 }
 
 const nameOf = new Map(roster.map((p) => [p.id, p.name]));
-const overallOf = new Map(roster.map((p) => [p.id, p.overall]));
+const currentOf = new Map(roster.map((p) => [p.id, p.current]));
 const strengthOf = new Map(roster.map((p, i) => [p.id, s[i]]));
 
 const pct = (x: number) => (Number.isNaN(x) ? "  n/a" : `${(x * 100).toFixed(0)}%`);
@@ -189,13 +223,13 @@ for (const [raterId, list] of [...byRater].sort(
   const name = (nameOf.get(raterId) ?? raterId).padEnd(14);
   console.log(
     `  ${name} ${String(list.length).padStart(4)}      ${pct(
-      agreementWithCurrent(list, overallOf),
+      agreementWithCurrent(list, currentOf),
     )}         ${pct(agreementWithConsensus(list, strengthOf))}`,
   );
 }
 console.log(
   `  ${"ALL".padEnd(14)} ${String(clean.length).padStart(4)}      ${pct(
-    agreementWithCurrent(clean, overallOf),
+    agreementWithCurrent(clean, currentOf),
   )}         ${pct(agreementWithConsensus(clean, strengthOf))}`,
 );
 console.log(
@@ -203,14 +237,16 @@ console.log(
     "  more than they agree with the existing ratings - the ratings are what moved.",
 );
 
-console.log("\nProposed overalls");
+console.log(
+  `\nProposed ${attribute ? `${attribute} ratings` : "overalls"}`,
+);
 console.log("  player          n    now   fit   delta");
 for (const f of [...fitted].sort((a, b) => b.proposed - a.proposed)) {
-  const delta = f.proposed - f.overall;
+  const delta = f.proposed - f.current;
   const mark = Math.abs(delta) >= 4 ? "  <-- moved" : "";
   console.log(
     `  ${f.name.padEnd(14)} ${String(f.appearances).padStart(3)}    ${String(
-      f.overall,
+      f.current,
     ).padStart(3)}   ${String(f.proposed).padStart(3)}   ${
       delta > 0 ? "+" : ""
     }${delta}${mark}`,

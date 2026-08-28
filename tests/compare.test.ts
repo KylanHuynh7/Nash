@@ -14,7 +14,9 @@ import { basketballPool } from "./fixtures";
 const pool: ComparePlayer[] = basketballPool().map((p) => ({
   id: p.id,
   name: p.name,
-  overall: p.overall,
+  // The "overall" axis steers on the overall. Other axes steer on their own
+  // attribute, which is the same field carrying a different number.
+  estimate: p.overall,
 }));
 
 /** Answer questions the way a rater would, and hand back what was asked. */
@@ -131,7 +133,7 @@ describe("nextPair", () => {
     // be indistinguishable from agreement with the existing ratings.
     const asked = runSession("kylan", 60);
     const strongerOnLeft = asked.filter(
-      (p) => p.left.overall > p.right.overall,
+      (p) => p.left.estimate > p.right.estimate,
     ).length;
     const ratio = strongerOnLeft / asked.length;
     assert.ok(
@@ -159,7 +161,7 @@ describe("nextPair", () => {
 describe("anchorPairs", () => {
   it("pairs each player with his neighbour on the ladder", () => {
     const keys = new Set(anchorPairs(pool));
-    const ladder = [...pool].sort((a, b) => b.overall - a.overall || (a.id < b.id ? -1 : 1));
+    const ladder = [...pool].sort((a, b) => b.estimate - a.estimate || (a.id < b.id ? -1 : 1));
     for (let i = 0; i + 1 < ladder.length; i++) {
       assert.ok(
         keys.has(pairKey(ladder[i].id, ladder[i + 1].id)),
@@ -170,7 +172,7 @@ describe("anchorPairs", () => {
 
   it("ties the top of the ladder to the bottom", () => {
     const keys = new Set(anchorPairs(pool));
-    const ladder = [...pool].sort((a, b) => b.overall - a.overall || (a.id < b.id ? -1 : 1));
+    const ladder = [...pool].sort((a, b) => b.estimate - a.estimate || (a.id < b.id ? -1 : 1));
     assert.ok(
       keys.has(pairKey(ladder[0].id, ladder[ladder.length - 1].id)),
       "nothing anchors the best player to the worst",

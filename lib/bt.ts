@@ -24,7 +24,13 @@
  *    already moves well-covered players a lot and thinly-covered ones barely.
  */
 
-export type BtPlayer = { id: string; name: string; overall: number };
+/**
+ * `current` is the existing single-rater rating on whatever axis is being fit:
+ * the overall for the "overall" axis, that attribute's rating for any other.
+ * It is the shrinkage prior, and the scale the fitted strengths are mapped back
+ * onto. Not named `overall`, because a throwing fit shrinks toward throwing.
+ */
+export type BtPlayer = { id: string; name: string; current: number };
 
 export type BtComparison = {
   raterId: string;
@@ -80,14 +86,14 @@ export type BtFit = {
   strengths: number[];
   /** How many comparisons each player appeared in. */
   appearances: number[];
-  /** The proposed overall, clamped to the rating scale and rounded. */
+  /** The proposed rating on this axis, clamped to the scale and rounded. */
   proposed: number[];
   /** The same figure before clamping and rounding, for diagnostics. */
   unclamped: number[];
   /** Roster id -> index, so callers can look strengths up by player. */
   index: Map<string, number>;
   /** What the latent scale is centred on. */
-  meanOverall: number;
+  meanCurrent: number;
   /** Iterations actually used, and whether it settled. */
   iterations: number;
   converged: boolean;
@@ -125,9 +131,9 @@ export function fitBradleyTerry(
 
   const index = new Map(roster.map((p, i) => [p.id, i]));
   const n = roster.length;
-  const meanOverall =
-    roster.reduce((sum, p) => sum + p.overall, 0) / Math.max(1, n);
-  const prior = roster.map((p) => (p.overall - meanOverall) / pointsPerUnit);
+  const meanCurrent =
+    roster.reduce((sum, p) => sum + p.current, 0) / Math.max(1, n);
+  const prior = roster.map((p) => (p.current - meanCurrent) / pointsPerUnit);
 
   const obs: { win: number; lose: number }[] = [];
   const appearances = new Array<number>(n).fill(0);
@@ -203,7 +209,7 @@ export function fitBradleyTerry(
     }
   }
 
-  const unclamped = roster.map((_, i) => meanOverall + s[i] * pointsPerUnit);
+  const unclamped = roster.map((_, i) => meanCurrent + s[i] * pointsPerUnit);
   const proposed = unclamped.map((raw) =>
     Math.round(Math.min(ratingMax, Math.max(ratingMin, raw))),
   );
@@ -214,7 +220,7 @@ export function fitBradleyTerry(
     proposed,
     unclamped,
     index,
-    meanOverall,
+    meanCurrent,
     iterations,
     converged,
   };
@@ -227,13 +233,13 @@ export function fitBradleyTerry(
  */
 export function agreementWithCurrent(
   rows: BtComparison[],
-  overallOf: Map<string, number>,
+  currentOf: Map<string, number>,
 ): number {
   let hits = 0;
   let total = 0;
   for (const row of rows) {
-    const a = overallOf.get(row.leftId);
-    const b = overallOf.get(row.rightId);
+    const a = currentOf.get(row.leftId);
+    const b = currentOf.get(row.rightId);
     if (a === undefined || b === undefined || a === b) continue;
     const favourite = a > b ? row.leftId : row.rightId;
     total++;

@@ -195,7 +195,12 @@ export async function lockEditing(): Promise<void> {
  * ------------------------------------------------------------------ */
 
 export type CompareBootstrap = {
-  pool: { id: string; name: string; overall: number }[];
+  /**
+   * `estimate` is the current number on the axis being collected, not always
+   * the overall — a throwing pass steers on the throwing rating. It picks which
+   * questions get asked and is never sent anywhere the rater can see it.
+   */
+  pool: { id: string; name: string; estimate: number }[];
   /** Pair keys this rater has already answered, so a sitting resumes cleanly. */
   answered: string[];
   seen: Record<string, number>;
@@ -207,16 +212,28 @@ export async function getCompareBootstrap(
   axis = "overall",
 ): Promise<CompareBootstrap> {
   const db = getDb();
-  const pool = await db
+  const attribute = SPORTS[sport].axes.find((a) => a.key === axis)?.attribute;
+
+  const profileRows = await db
     .select({
       id: players.id,
       name: players.name,
       overall: profiles.overall,
+      ratings: profiles.ratings,
     })
     .from(profiles)
     .innerJoin(players, eq(players.id, profiles.playerId))
     .where(eq(profiles.sport, sport))
     .orderBy(asc(players.name));
+
+  // An axis that names an attribute steers on that attribute. Falling back to
+  // the overall when the rating is missing keeps a half-rated roster asking
+  // sensible questions instead of treating everyone as identical.
+  const pool = profileRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    estimate: attribute ? (row.ratings[attribute] ?? row.overall) : row.overall,
+  }));
 
   if (!raterId) return { pool, answered: [], seen: {} };
 

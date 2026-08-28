@@ -9,6 +9,42 @@ export type Attribute = {
   weight: number;
 };
 
+/**
+ * A question the comparison collector can ask.
+ *
+ * "Who'd you rather have" is the first axis and carries most of the signal, so
+ * extra axes earn their place only when they are genuinely independent of it.
+ * Shooting, finishing and playmaking correlate at 0.88-0.94, which means a
+ * "who's the better shooter" pass would largely re-collect the overall pass.
+ * Rebounding (0.43 average correlation) and defense (0.57) are the independent
+ * ones, and `throwing` is a special case: it is not correlated with anything
+ * because it contains no information at all yet.
+ *
+ * Send one axis at a time. Asking for two passes up front is how you get
+ * neither.
+ */
+export type CompareAxis = {
+  key: string;
+  /**
+   * The page's headline. Written per axis rather than derived from the label,
+   * because deriving it produces things like "Who's better: throwing?".
+   */
+  heading: string;
+  /** Exactly what the rater is asked, in their words. */
+  question: string;
+  /** How the axis is named in scripts and links. */
+  label: string;
+  /**
+   * The attribute a fit on this axis estimates.
+   *
+   * Omitted for "overall", which is a weighted mean rather than a stored
+   * number, so a fit on it proposes `profiles.overall`. Named for every other
+   * axis, which tells `fit-bt.mts` two things it cannot otherwise know: which
+   * rating to use as the shrinkage prior, and which one a proposal applies to.
+   */
+  attribute?: string;
+};
+
 export type Position = {
   key: string;
   label: string;
@@ -45,6 +81,13 @@ export type SportConfig = {
   comingSoon?: boolean;
   /** What the playing surface is called — 'court', 'field'. */
   surface: string;
+  /**
+   * Questions `/compare/[sport]` can collect, first one the default.
+   *
+   * Every sport opens with "overall" because that is the number the balancer
+   * actually uses, and so the number worth de-biasing first.
+   */
+  axes: CompareAxis[];
   /**
    * Where each lineup spot sits on the playing surface, as percentages.
    *
@@ -85,6 +128,14 @@ export const SPORTS: Record<SportId, SportConfig> = {
     sideSize: 5,
     accent: "#e01e37",
     surface: "court",
+    axes: [
+      {
+        key: "overall",
+        label: "Overall",
+        heading: "Who's better?",
+        question: "Pick who you'd rather have on your team.",
+      },
+    ],
     attributes: [
       // Weighted for full-court games to 11: you run the whole floor, boards
       // start breaks, and the man who can still go at 9-9 decides it.
@@ -149,6 +200,27 @@ export const SPORTS: Record<SportId, SportConfig> = {
     sideSize: 5,
     accent: "#16a34a",
     surface: "field",
+    axes: [
+      {
+        key: "overall",
+        label: "Overall",
+        heading: "Who's better?",
+        question: "Pick who you'd rather have on your team.",
+      },
+      // The one axis in the app that is filling a hole rather than checking a
+      // number. Every football player carries throwing = 75 — a flat value
+      // invented because no basketball skill implies an arm — and it is load
+      // bearing: it decides who lines up at quarterback and the balancer scores
+      // it on each side's best rather than its average. So it steers the teams
+      // while containing no information whatsoever.
+      {
+        key: "throwing",
+        label: "Throwing",
+        attribute: "throwing",
+        heading: "Who's got the arm?",
+        question: "Pick who you'd rather have throwing the ball.",
+      },
+    ],
     // Nobody is designated. A side can ride whoever has the hot hand, and does.
     decisiveAttribute: "throwing",
     attributes: [

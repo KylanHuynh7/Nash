@@ -30,12 +30,12 @@ function rng(seed: number) {
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
 
-/** A roster whose stored overalls are deliberately flat, so only data moves it. */
-function roster(count: number, overall = 80): BtPlayer[] {
+/** A roster whose stored ratings are deliberately flat, so only data moves it. */
+function roster(count: number, current = 80): BtPlayer[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `p${i}`,
     name: `P${i}`,
-    overall,
+    current,
   }));
 }
 
@@ -166,12 +166,41 @@ describe("fitBradleyTerry", () => {
     );
   });
 
+  it("recovers a ranking from a prior that carries no information", () => {
+    /*
+     * This is football's `throwing`, exactly: every player holds a flat 75,
+     * invented because no basketball skill implies an arm, and yet the column
+     * decides who lines up at quarterback and is scored on each team's best.
+     * The prior contributes nothing, so the ranking has to come entirely from
+     * the comparisons — and the proposals still have to land on the 65-99
+     * scale rather than collapsing onto the flat value they shrank from.
+     */
+    const people = roster(6, 75);
+    const truth = [2.4, 1.5, 0.6, -0.3, -1.2, -2.1];
+    const rows = simulate(people, truth, { rounds: 30, seed: 5 });
+    const fit = fitBradleyTerry(people, rows, { lambda: 1 });
+
+    assert.deepEqual(
+      order(people, fit.strengths),
+      people.map((p) => p.id),
+      "a flat prior lost the ranking",
+    );
+    // Centred on the flat prior, because that is the only scale available.
+    assert.equal(fit.meanCurrent, 75);
+    const spread = Math.max(...fit.proposed) - Math.min(...fit.proposed);
+    assert.ok(spread >= 8, `proposals barely separated: spread ${spread}`);
+    assert.ok(
+      fit.proposed.every((v) => v >= 65 && v <= 99),
+      `off the scale: ${fit.proposed}`,
+    );
+  });
+
   it("stays finite at any lambda, however extreme", () => {
     // --lambda is a CLI flag with no upper bound. It used to overflow to NaN
     // above 40, and NaN proposals print as blanks rather than as an error.
     const people = [
-      { id: "a", name: "A", overall: 95 },
-      { id: "b", name: "B", overall: 70 },
+      { id: "a", name: "A", current: 95 },
+      { id: "b", name: "B", current: 70 },
     ];
     const rows: BtComparison[] = Array.from({ length: 40 }, (_, i) => ({
       raterId: `r${i}`,
@@ -196,8 +225,8 @@ describe("fitBradleyTerry", () => {
     // Raising lambda must move players steadily back toward their priors,
     // never past them and never erratically.
     const people = [
-      { id: "a", name: "A", overall: 95 },
-      { id: "b", name: "B", overall: 70 },
+      { id: "a", name: "A", current: 95 },
+      { id: "b", name: "B", current: 70 },
     ];
     const rows: BtComparison[] = Array.from({ length: 40 }, (_, i) => ({
       raterId: `r${i}`,
@@ -242,9 +271,9 @@ describe("fitBradleyTerry", () => {
       // The whole reason the penalty exists: an unmentioned player must keep
       // his number rather than drifting to the middle of the scale.
       const people: BtPlayer[] = [
-        { id: "a", name: "A", overall: 95 },
-        { id: "b", name: "B", overall: 70 },
-        { id: "ghost", name: "Ghost", overall: 88 },
+        { id: "a", name: "A", current: 95 },
+        { id: "b", name: "B", current: 70 },
+        { id: "ghost", name: "Ghost", current: 88 },
       ];
       const rows: BtComparison[] = [
         { raterId: "r", leftId: "a", rightId: "b", winnerId: "a" },
@@ -260,8 +289,8 @@ describe("fitBradleyTerry", () => {
 
     it("a high lambda holds players at their existing ratings", () => {
       const people = [
-        { id: "a", name: "A", overall: 95 },
-        { id: "b", name: "B", overall: 70 },
+        { id: "a", name: "A", current: 95 },
+        { id: "b", name: "B", current: 70 },
       ];
       // Data says B beats A, emphatically, every time.
       const rows: BtComparison[] = Array.from({ length: 40 }, (_, i) => ({
@@ -277,8 +306,8 @@ describe("fitBradleyTerry", () => {
 
     it("a low lambda lets the data overturn them", () => {
       const people = [
-        { id: "a", name: "A", overall: 95 },
-        { id: "b", name: "B", overall: 70 },
+        { id: "a", name: "A", current: 95 },
+        { id: "b", name: "B", current: 70 },
       ];
       const rows: BtComparison[] = Array.from({ length: 40 }, (_, i) => ({
         raterId: `r${i}`,
@@ -301,9 +330,9 @@ describe("fitBradleyTerry", () => {
        * global lambda defensible.
        */
       const people = [
-        { id: "a", name: "A", overall: 80 },
-        { id: "covered", name: "Covered", overall: 80 },
-        { id: "thin", name: "Thin", overall: 80 },
+        { id: "a", name: "A", current: 80 },
+        { id: "covered", name: "Covered", current: 80 },
+        { id: "thin", name: "Thin", current: 80 },
       ];
       const rows: BtComparison[] = [
         ...Array.from({ length: 40 }, (_, i) => ({
@@ -340,8 +369,8 @@ describe("fitBradleyTerry", () => {
 
     it("clamps proposals to the rating scale", () => {
       const people = [
-        { id: "god", name: "God", overall: 99 },
-        { id: "mortal", name: "Mortal", overall: 65 },
+        { id: "god", name: "God", current: 99 },
+        { id: "mortal", name: "Mortal", current: 65 },
       ];
       const rows: BtComparison[] = Array.from({ length: 200 }, (_, i) => ({
         raterId: `r${i}`,
@@ -357,12 +386,12 @@ describe("fitBradleyTerry", () => {
 
     it("keeps the existing mean as the centre of the proposed scale", () => {
       const people = [
-        { id: "a", name: "A", overall: 90 },
-        { id: "b", name: "B", overall: 80 },
-        { id: "c", name: "C", overall: 70 },
+        { id: "a", name: "A", current: 90 },
+        { id: "b", name: "B", current: 80 },
+        { id: "c", name: "C", current: 70 },
       ];
       const fit = fitBradleyTerry(people, [], { lambda: 1 });
-      assert.equal(fit.meanOverall, 80);
+      assert.equal(fit.meanCurrent, 80);
       // With no data at all, everyone stays exactly where they were.
       assert.deepEqual(fit.proposed, [90, 80, 70]);
     });
@@ -402,8 +431,8 @@ describe("fitBradleyTerry", () => {
 
     it("POINTS_PER_UNIT sets what a latent unit is worth in rating points", () => {
       const people = [
-        { id: "a", name: "A", overall: 80 },
-        { id: "b", name: "B", overall: 80 },
+        { id: "a", name: "A", current: 80 },
+        { id: "b", name: "B", current: 80 },
       ];
       const rows: BtComparison[] = Array.from({ length: 30 }, (_, i) => ({
         raterId: `r${i}`,
@@ -467,7 +496,7 @@ describe("filters", () => {
 });
 
 describe("agreement diagnostics", () => {
-  const overallOf = new Map([
+  const currentOf = new Map([
     ["a", 90],
     ["b", 80],
     ["c", 80], // deliberately tied with b
@@ -478,7 +507,7 @@ describe("agreement diagnostics", () => {
       { raterId: "r", leftId: "a", rightId: "b", winnerId: "a" }, // agrees
       { raterId: "r", leftId: "a", rightId: "b", winnerId: "b" }, // disagrees
     ];
-    assert.equal(agreementWithCurrent(rows, overallOf), 0.5);
+    assert.equal(agreementWithCurrent(rows, currentOf), 0.5);
   });
 
   it("skips pairs the stored ratings cannot separate", () => {
@@ -488,11 +517,11 @@ describe("agreement diagnostics", () => {
       { raterId: "r", leftId: "b", rightId: "c", winnerId: "b" },
       { raterId: "r", leftId: "a", rightId: "b", winnerId: "a" },
     ];
-    assert.equal(agreementWithCurrent(rows, overallOf), 1);
+    assert.equal(agreementWithCurrent(rows, currentOf), 1);
   });
 
   it("returns NaN rather than 0 when there is nothing to score", () => {
-    assert.ok(Number.isNaN(agreementWithCurrent([], overallOf)));
+    assert.ok(Number.isNaN(agreementWithCurrent([], currentOf)));
     assert.ok(Number.isNaN(agreementWithConsensus([], new Map())));
   });
 
@@ -515,6 +544,6 @@ describe("agreement diagnostics", () => {
       { raterId: "r", leftId: "a", rightId: "b", winnerId: "b" },
       { raterId: "r", leftId: "b", rightId: "a", winnerId: "b" },
     ];
-    assert.equal(agreementWithCurrent(rows, overallOf), 0);
+    assert.equal(agreementWithCurrent(rows, currentOf), 0);
   });
 });

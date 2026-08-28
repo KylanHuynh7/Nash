@@ -65,6 +65,21 @@ describe("rater tokens", () => {
     }
   });
 
+  it("leaves the default axis out of the link", () => {
+    // The overall pass is the one most links are for, and a URL with a
+    // redundant &axis=overall is a URL people ask questions about.
+    const token = newRaterToken();
+    assert.equal(raterPath("basketball", token), `/compare/basketball?rater=${token}`);
+    assert.equal(
+      raterPath("basketball", token, "overall"),
+      `/compare/basketball?rater=${token}`,
+    );
+    assert.equal(
+      raterPath("football", token, "throwing"),
+      `/compare/football?rater=${token}&axis=throwing`,
+    );
+  });
+
   it("builds a link the page can read back", () => {
     const token = newRaterToken();
     const path = raterPath("basketball", token);

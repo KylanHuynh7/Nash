@@ -2,6 +2,7 @@
  * Issues one comparison link per person and prints them for sending.
  *
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball
+ *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts football --axis throwing
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts football --base http://192.168.12.176:3000
  *
  * ## Why one link each
@@ -38,6 +39,7 @@ const args = process.argv.slice(2);
 const sport = args[0];
 const base = (valueOf("--base") ?? DEFAULT_BASE).replace(/\/+$/, "");
 const rotate = valueOf("--rotate");
+const axisKey = valueOf("--axis");
 
 function valueOf(flag: string): string | undefined {
   const at = args.indexOf(flag);
@@ -46,7 +48,22 @@ function valueOf(flag: string): string | undefined {
 
 if (!sport || !isSportId(sport)) {
   console.error(
-    `usage: rater-links.mts <${Object.keys(SPORTS).join("|")}> [--base URL] [--rotate NAME]`,
+    `usage: rater-links.mts <${Object.keys(SPORTS).join("|")}> [--axis KEY] [--base URL] [--rotate NAME]`,
+  );
+  process.exit(1);
+}
+
+// Which pass these links are for. Defaults to the sport's first axis, the
+// overall — the number the balancer actually uses, so the one worth collecting
+// first.
+const axis = axisKey
+  ? SPORTS[sport].axes.find((a) => a.key === axisKey)
+  : SPORTS[sport].axes[0];
+if (!axis) {
+  console.error(
+    `Unknown axis "${axisKey}" for ${sport}. Configured: ${SPORTS[sport].axes
+      .map((a) => a.key)
+      .join(", ")}`,
   );
   process.exit(1);
 }
@@ -121,11 +138,14 @@ const roster = await db
 
 const width = Math.max(...roster.map((r) => r.name.length));
 
-console.log(`${SPORTS[sport].label} — ${roster.length} links. Send one each.\n`);
+console.log(
+  `${SPORTS[sport].label} / ${axis.label} — ${roster.length} links. Send one each.`,
+);
+console.log(`  "${axis.question}"\n`);
 for (const person of roster) {
   if (!person.token) continue; // Unreachable: every row was just backfilled.
   console.log(
-    `  ${person.name.padEnd(width)}  ${base}${raterPath(sport, person.token)}`,
+    `  ${person.name.padEnd(width)}  ${base}${raterPath(sport, person.token, axis.key)}`,
   );
 }
 console.log();

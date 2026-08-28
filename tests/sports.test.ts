@@ -177,6 +177,50 @@ describe("sport config", () => {
     }
   });
 
+  it("every sport opens with the overall axis", () => {
+    // Overall is the number the balancer uses, so it is the one worth
+    // de-biasing first and the one a bare link must ask for.
+    for (const sport of Object.values(SPORTS)) {
+      assert.ok(sport.axes.length > 0, `${sport.id} has no axes`);
+      assert.equal(sport.axes[0].key, "overall", `${sport.id} opens elsewhere`);
+      assert.equal(
+        sport.axes[0].attribute,
+        undefined,
+        "the overall axis is a weighted mean, not a stored attribute",
+      );
+    }
+  });
+
+  it("every axis is asked as a question and names a real attribute", () => {
+    for (const sport of Object.values(SPORTS)) {
+      const keys = new Set<string>();
+      for (const axis of sport.axes) {
+        assert.ok(!keys.has(axis.key), `${sport.id} repeats axis ${axis.key}`);
+        keys.add(axis.key);
+        assert.ok(axis.question.length > 0, `${axis.key} asks nothing`);
+        assert.ok(axis.label.length > 0, `${axis.key} has no label`);
+        assert.ok(axis.heading.length > 0, `${axis.key} has no heading`);
+        if (axis.attribute) {
+          // An axis pointing at an attribute that does not exist would collect
+          // answers nothing could ever be fitted to.
+          assert.ok(
+            sport.attributes.some((a) => a.key === axis.attribute),
+            `${sport.id} axis ${axis.key} names unknown attribute ${axis.attribute}`,
+          );
+        }
+      }
+    }
+  });
+
+  it("football collects throwing, the one attribute carrying no information", () => {
+    // It is flat 75 for everyone, it decides who plays quarterback, and the
+    // balancer scores it on each side's best. Load-bearing and empty.
+    const axis = SPORTS.football.axes.find((a) => a.key === "throwing");
+    assert.ok(axis, "football no longer collects throwing");
+    assert.equal(axis.attribute, "throwing");
+    assert.equal(SPORTS.football.decisiveAttribute, "throwing");
+  });
+
   it("isSportId accepts only configured sports", () => {
     assert.ok(isSportId("basketball"));
     assert.ok(isSportId("football"));

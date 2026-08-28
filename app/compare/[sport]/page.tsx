@@ -24,7 +24,15 @@ export default async function ComparePage(
 
   const config = SPORTS[sport];
   const chrome = sportChrome(config) as React.CSSProperties;
-  const { rater: token } = await props.searchParams;
+  const { rater: token, axis: axisParam } = await props.searchParams;
+
+  // Which question this link asks. Unknown axes 404 rather than quietly
+  // collecting under a key nothing will ever fit, and the default is always the
+  // sport's first axis — the overall, which is the number the balancer uses.
+  const axis = axisParam
+    ? config.axes.find((a) => a.key === axisParam)
+    : config.axes[0];
+  if (!axis) notFound();
 
   // No token at all is the ordinary case for someone reopening the page from
   // their history, so the gate checks for a remembered link before refusing.
@@ -51,7 +59,7 @@ export default async function ComparePage(
   // client refetched once it could read who was asking.
   let bootstrap;
   try {
-    bootstrap = await getCompareBootstrap(sport, rater.id);
+    bootstrap = await getCompareBootstrap(sport, rater.id, axis.key);
   } catch {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-5 py-16">
@@ -71,6 +79,7 @@ export default async function ComparePage(
     <div className="flex flex-1 flex-col" style={chrome}>
       <CompareApp
         config={config}
+        axis={axis}
         bootstrap={bootstrap}
         rater={rater}
         token={String(token)}

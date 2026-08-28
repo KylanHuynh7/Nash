@@ -9,8 +9,21 @@
 export type ComparePlayer = {
   id: string;
   name: string;
-  /** The current single-rater overall. Used only to *choose* questions. */
-  overall: number;
+  /**
+   * The current single-rater number on the axis being collected — the overall
+   * for the "overall" axis, that attribute's rating for any other.
+   *
+   * Used only to *choose* questions, and never shown. It is called `estimate`
+   * rather than `overall` because a throwing pass has to steer on the throwing
+   * rating; a field named `overall` quietly holding a throwing number is the
+   * kind of thing that gets discovered a year later.
+   *
+   * A brand-new group — or an axis nobody has rated, which is exactly what
+   * `throwing` is — makes every value equal. That is the intended cold-start
+   * behaviour, not a degenerate case: `informativeness` flattens to a constant
+   * and selection falls back to coverage alone.
+   */
+  estimate: number;
 };
 
 export type Pair = { left: ComparePlayer; right: ComparePlayer };
@@ -44,14 +57,14 @@ function hash(seed: number): number {
  * nothing anchoring the far ends of the scale to each other, so a floor of 0.3
  * keeps wide pairs in the sample.
  *
- * Note what this does and does not use. The current overall picks *which
+ * Note what this does and does not use. The current estimate picks *which
  * question to ask*; it is never shown to the rater and never enters the answer.
  * Steering the questions with a prior is ordinary active learning. Showing the
  * prior would be anchoring, and would contaminate the one independent signal
  * being collected.
  */
 function informativeness(a: ComparePlayer, b: ComparePlayer): number {
-  const gap = Math.abs(a.overall - b.overall);
+  const gap = Math.abs(a.estimate - b.estimate);
   return 0.3 + 0.7 * Math.exp(-gap / 6);
 }
 
@@ -88,7 +101,7 @@ function coverage(seen: number): number {
  */
 export function anchorPairs(pool: ComparePlayer[]): string[] {
   const ladder = [...pool].sort(
-    (a, b) => b.overall - a.overall || (a.id < b.id ? -1 : 1),
+    (a, b) => b.estimate - a.estimate || (a.id < b.id ? -1 : 1),
   );
   const keys: string[] = [];
   for (let i = 0; i + 1 < ladder.length; i++) {

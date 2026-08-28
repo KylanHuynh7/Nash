@@ -115,7 +115,9 @@ export default function CompareLinkGate({
         >
           ← {config.label}
         </Link>
-        <h1 className="metal mt-3 text-2xl leading-none">Who&apos;s better?</h1>
+        <h1 className="metal mt-3 text-2xl leading-none">
+          {config.axes[0].heading}
+        </h1>
       </header>
 
       <div className="rounded-2xl border border-line bg-surface p-6 shadow-[var(--shadow-card)]">

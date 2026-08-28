@@ -82,7 +82,15 @@ export function isRaterToken(value: unknown): value is string {
   return true;
 }
 
-/** The link one person opens to rate. Relative, so it works on any host. */
-export function raterPath(sport: string, token: string): string {
-  return `/compare/${sport}?rater=${token}`;
+/**
+ * The link one person opens to rate. Relative, so it works on any host.
+ *
+ * The axis rides in the link rather than being chosen on the page, which keeps
+ * one link doing one job: you send the throwing pass when you want the throwing
+ * pass. Asking for two passes up front is how you get neither. The default axis
+ * is left out of the URL so the ordinary link stays short.
+ */
+export function raterPath(sport: string, token: string, axis?: string): string {
+  const base = `/compare/${sport}?rater=${token}`;
+  return axis && axis !== "overall" ? `${base}&axis=${axis}` : base;
 }

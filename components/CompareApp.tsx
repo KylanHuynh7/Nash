@@ -18,7 +18,7 @@ import {
   type Pair,
 } from "@/lib/compare";
 import type { Rater } from "@/lib/rater";
-import type { SportConfig } from "@/lib/sports";
+import type { CompareAxis, SportConfig } from "@/lib/sports";
 
 /**
  * The collector.
@@ -32,11 +32,13 @@ import type { SportConfig } from "@/lib/sports";
  */
 export default function CompareApp({
   config,
+  axis,
   bootstrap,
   rater,
   token,
 }: {
   config: SportConfig;
+  axis: CompareAxis;
   bootstrap: CompareBootstrap;
   rater: Rater;
   token: string;
@@ -99,6 +101,7 @@ export default function CompareApp({
 
     void submitComparison({
       sport: config.id,
+      axis: axis.key,
       raterId: rater.id,
       sessionId: sessionRef.current,
       leftId: pair.left.id,
@@ -124,10 +127,10 @@ export default function CompareApp({
         >
           ← {config.label}
         </Link>
-        <h1 className="metal mt-3 text-2xl leading-none">Who&apos;s better?</h1>
+        <h1 className="metal mt-3 text-2xl leading-none">{axis.heading}</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Pick who you&apos;d rather have on your team. Go with your gut —
-          there&apos;s no wrong answer, and nobody sees your picks individually.
+          {axis.question} Go with your gut — there&apos;s no wrong answer, and
+          nobody sees your picks individually.
         </p>
       </header>
 
