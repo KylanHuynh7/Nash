@@ -19,6 +19,12 @@
   --foreground: #f7f9ff;
   --muted: #9fb0dc;
 
+  /* Text that sits directly on the page's silver ground. --foreground and
+     --muted are tuned for dark cards and vanish out here, so anything outside
+     a surface uses this instead. */
+  --ink: #191c23;
+  --ink-soft: #4a5060;
+
   --accent: #d50a0a;
   --accent-strong: #ff2e2e;
   --accent-wash: #2b0d18;
@@ -38,6 +44,8 @@
   --color-line-strong: var(--border-strong);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-wash: var(--accent-wash);
@@ -48,14 +56,15 @@
 }
 
 body {
-  /* Court-light spill: a hot wash of the sport's colour up top, falling off
-     into black, so the page reads as an arena rather than a dark rectangle. */
-  background:
-    radial-gradient(75rem 38rem at 10% -8rem, color-mix(in srgb, var(--accent) 55%, transparent), transparent),
-    radial-gradient(60rem 34rem at 95% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent),
-    radial-gradient(90rem 40rem at 50% 108%, color-mix(in srgb, var(--accent) 20%, transparent), transparent),
-    var(--background);
-  background-attachment: fixed;
+  /* A neutral, and deliberately not Nash's navy.
+   *
+   * Every page paints its own ground in a fixed layer on top of this one: the
+   * landing page's ShardField, a sport's SportShards. Whenever body carried a
+   * *contrasting* colour, any moment that layer wasn't painted — the first
+   * frame, a repaint after a heavy render — flashed navy through the page
+   * before the real ground arrived. Matching the grounds means the worst case
+   * is now an unnoticeable frame of plain silver instead. */
+  background: #eceef2;
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -72,14 +81,14 @@ body {
 /* Brushed steel, the way the box art sets its type. Falls back to plain white
    anywhere background-clip:text isn't honoured. */
 .metal {
-  color: #fff;
+  color: var(--ink);
   background: linear-gradient(
     177deg,
-    #ffffff 0%,
-    #e8ecf5 38%,
-    #939cb0 54%,
-    #ffffff 74%,
-    #c6ccd9 100%
+    #3b414f 0%,
+    #171a20 38%,
+    #6b7385 54%,
+    #14161b 74%,
+    #454b5a 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -95,7 +104,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--ink-soft);
 }
 
 /* One diagonal cut, used on the accent blocks. Angles are most of what makes

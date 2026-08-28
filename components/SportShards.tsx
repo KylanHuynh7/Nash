@@ -1,235 +1,252 @@
 /**
- * The backdrop behind a sport's page: the arena floor, broken.
+ * The backdrop behind a sport's page: brushed silver, with the plane shattered
+ * at the centre.
  *
- * The landing page's ShardField breaks a *light* plane into two masses that
- * meet at a corridor. This one has a different job and so a different shape:
- * the content column sits on top of it, so the field has to be loud where
- * there are no words and nearly silent where there are.
+ * This is a different construction from the landing page's ShardField, because
+ * it wants a different thing. ShardField breaks a plane into parallel bands —
+ * orderly, one lean, a fault line. Here the break is an *impact*: shards radiate
+ * from a centre, and they are meant to look chaotic.
  *
- * Three rules, the same discipline as ShardField:
+ * Chaos and connectedness pull against each other, and the obvious route to
+ * chaos — scattering independent polygons — loses the connectedness at once:
+ * that gives confetti, with silver showing through the gaps between pieces. So
+ * the field is built as a **web**, not as a pile:
  *
- * 1. **Every long edge leans the same way — a `\`, down and to the right.**
- *    One lean for the whole field is what makes it read as a single plane that
- *    broke, rather than as scattered triangles.
- * 2. **Fragments replace a segment of a band, so their long edges are that
- *    band's own edges.** Nothing is laid *over* the plane; the plane itself
- *    comes apart. Skewing where each fragment is cut keeps the breaks from
- *    lining up into a stripe.
- * 3. **Value falls to the ground by the halfway mark.** The colour is spent in
- *    the top third, above and behind the header, and everything below it ramps
- *    into near-black so roster cards keep their contrast. A shard field that
- *    stays bright to the bottom is a wallpaper, not a backdrop.
+ *   - A ring of rays leaves the centre at uneven angles.
+ *   - Several rings cross them at uneven radii, jittered per ray.
+ *   - Every shard is the quad between two neighbouring rays and two
+ *     neighbouring rings.
  *
- * Everything is derived from the sport's one declared accent, so football gets
- * this for free in green the day its ratings land.
+ * Because neighbouring shards are cut from the *same corner points*, every edge
+ * is shared exactly — the mass is one shattered pane with no seams — while the
+ * jitter on each point means no two shards are alike and no edge stays straight
+ * for long. Jagged, and still connected.
+ *
+ * The outer ring fades unevenly, so the mass breaks up into the silver rather
+ * than sitting on it as a disc.
  */
 
 type Palette = {
   hot: string;
-  full: string;
-  deep: string;
-  dusk: string;
-  ember: string;
-  charHi: string;
-  char: string;
-  ground: string;
+  red: string;
+  redDeep: string;
+  ink: string;
+  inkSoft: string;
+  silver: string;
 };
 
-/**
- * The ramp from accent to ground. The steps are uneven on purpose: the top of
- * the ramp is where the colour lives, so it gets the wide, saturated stops,
- * and the bottom crowds together into a set of near-blacks that differ just
- * enough to catch a facet edge without ever reading as a shape.
- */
 function paletteFor(accent: string): Palette {
   const mix = (pct: number, base: string) =>
     `color-mix(in srgb, ${accent} ${pct}%, ${base})`;
   return {
-    hot: mix(88, "#ff5a5a"),
-    full: mix(82, "#07070a"),
-    deep: mix(48, "#07070a"),
-    dusk: mix(26, "#07070a"),
-    ember: mix(15, "#07070a"),
-    charHi: mix(11, "#1a1a22"),
-    char: mix(9, "#101015"),
-    // Matches --background from sportChrome, so the SVG and the div behind it
-    // are the same colour and the field has no visible bottom edge.
-    ground: mix(7, "#07070a"),
+    hot: mix(86, "#ff6a6a"),
+    red: accent,
+    redDeep: mix(66, "#0b0b0e"),
+    ink: "#0d0d11",
+    inkSoft: "#20202a",
+    silver: "#c5c9d2",
   };
 }
 
-type Shard = [points: string, fill: keyof Palette, opacity?: number];
-
-/* ---------------------------------------------------------------------------
- * Wide window: 160x100. Bands run across rather than down — vertical bands
- * would stand behind the whole content column for its full height, and no
- * amount of dimming makes that quiet.
- * ------------------------------------------------------------------------ */
-const WIDE_DROP = 18;
-
-/** y of a `\` line at horizontal position x. Every long edge is parallel. */
-const wy = (yLeft: number, x: number) => yLeft + (WIDE_DROP * x) / 160;
-
-const wideBand = (aLeft: number, bLeft: number) =>
-  `0,${aLeft} 160,${wy(aLeft, 160)} 160,${wy(bLeft, 160)} 0,${bLeft}`;
+/**
+ * Deterministic value noise, on integer arithmetic only.
+ *
+ * The field has to come out *bit*-identical on the server and on the client, or
+ * React reports a hydration mismatch. Math.random() is the obvious way to fail
+ * that, but the subtler one is `Math.sin` — the usual one-line hash noise —
+ * which ECMAScript does not require to be identical across implementations.
+ * Node's V8 and the browser's are different builds, and their last bits diverge,
+ * which is enough to move a shard and mismatch the tree. Math.imul is exact
+ * everywhere, so the hash is built from that instead.
+ */
+function noise(a: number, b: number): number {
+  let h = Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 /**
- * A fragment of one band, cut between x0 and x1. `skew` offsets where the far
- * edge is cut, so a fragment is a leaning quadrilateral rather than a block.
+ * Coordinates reach the DOM through this. Math.cos/Math.sin have the same
+ * cross-implementation licence as above, so the geometry is rounded to a
+ * precision far coarser than any divergence before it is ever stringified.
  */
-const wideShard = (
-  aLeft: number,
-  bLeft: number,
-  x0: number,
-  x1: number,
-  skew: number,
-) =>
-  `${x0},${wy(aLeft, x0)} ${x1},${wy(aLeft, x1)} ` +
-  `${x1 + skew},${wy(bLeft, x1 + skew)} ${x0 + skew},${wy(bLeft, x0 + skew)}`;
+const fx = (n: number) => n.toFixed(3);
 
-const WIDE: Shard[] = [
-  // --- The ramp. It is spent by y=54 and almost all of the saturated colour
-  // sits above y=18 — behind the header, above the first roster chip.
-  [wideBand(-34, -12), "hot"],
-  [wideBand(-12, 0), "full"],
-  [wideBand(0, 9), "deep"],
-  [wideBand(9, 18), "dusk"],
-  [wideBand(18, 28), "ember"],
-  [wideBand(28, 40), "charHi"],
-  [wideBand(40, 54), "char"],
+const RAYS = 18;
+/**
+ * Ring radii as a fraction of the mass. The gaps widen outward, so shards grow
+ * as they travel — the way fragments thrown from an impact do.
+ */
+const RINGS = [0.07, 0.2, 0.36, 0.55, 0.78, 1];
 
-  // --- Dark breaking upward into the colour. These are what stop the ramp
-  // from reading as a gradient: a band loses a segment to the value two steps
-  // below it, so the plane looks fractured rather than blended.
-  [wideShard(-12, 0, 6, 48, 4), "deep"],
-  [wideShard(0, 9, 60, 102, -5), "dusk"],
-  [wideShard(9, 18, 16, 56, 5), "ember"],
-  [wideShard(-12, 0, 98, 140, -4), "dusk"],
-  [wideShard(0, 9, 116, 164, 4), "ember"],
-  [wideShard(9, 18, 72, 118, -5), "charHi"],
-  [wideShard(18, 28, 30, 76, 5), "charHi"],
-
-  // --- Colour breaking downward into the dark. Held to the right and to the
-  // outer margins, which is where the content column isn't. A staircase of
-  // fragments stepping down to the right carries the eye the way the cover's
-  // arrow does, without introducing a second angle to the plane.
-  [wideShard(9, 18, 112, 150, 5), "full"],
-  [wideShard(18, 28, 128, 168, -4), "deep"],
-  [wideShard(28, 40, 142, 178, 5), "dusk"],
-  [wideShard(9, 18, -8, 20, -4), "full"],
-  [wideShard(18, 28, -10, 14, 4), "deep"],
-  [wideShard(28, 40, -12, 10, -3), "ember"],
-  // Two low embers so the bottom half catches an edge instead of going dead.
-  [wideShard(40, 54, 134, 174, 4), "dusk"],
-  [wideShard(40, 54, -12, 8, -4), "charHi"],
-];
-
-/* ---------------------------------------------------------------------------
- * Phone: 100x200. Same construction, but the ramp is stretched — a phone shows
- * the top of the page for much longer, so the colour has further to fall.
- * ------------------------------------------------------------------------ */
-const TALL_DROP = 20;
-
-const ty = (yLeft: number, x: number) => yLeft + (TALL_DROP * x) / 100;
-
-const tallBand = (aLeft: number, bLeft: number) =>
-  `0,${aLeft} 100,${ty(aLeft, 100)} 100,${ty(bLeft, 100)} 0,${bLeft}`;
-
-const tallShard = (
-  aLeft: number,
-  bLeft: number,
-  x0: number,
-  x1: number,
-  skew: number,
-) =>
-  `${x0},${ty(aLeft, x0)} ${x1},${ty(aLeft, x1)} ` +
-  `${x1 + skew},${ty(bLeft, x1 + skew)} ${x0 + skew},${ty(bLeft, x0 + skew)}`;
-
-const TALL: Shard[] = [
-  // A phone stacks the header, the tab row and the roster into the top third,
-  // so the ramp is *compressed* rather than stretched: the saturated steps are
-  // spent by y=16 — under the header — and the muted subtitle never has to sit
-  // on a bright band.
-  [tallBand(-40, -16), "hot"],
-  [tallBand(-16, -2), "full"],
-  [tallBand(-2, 7), "deep"],
-  [tallBand(7, 16), "dusk"],
-  [tallBand(16, 28), "ember"],
-  [tallBand(28, 44), "charHi"],
-  [tallBand(44, 64), "char"],
-
-  // Dark up into the colour.
-  [tallShard(-16, -2, 4, 42, 4), "deep"],
-  [tallShard(-2, 7, 48, 90, -5), "dusk"],
-  [tallShard(7, 16, 10, 46, 5), "ember"],
-  [tallShard(-2, 7, -8, 18, 4), "ember"],
-  [tallShard(16, 28, 54, 98, -4), "charHi"],
-
-  // Colour down into the dark, kept to the edges.
-  [tallShard(7, 16, 70, 108, 4), "full"],
-  [tallShard(16, 28, 78, 112, -5), "deep"],
-  [tallShard(28, 44, 88, 118, 4), "dusk"],
-  [tallShard(16, 28, -12, 12, -4), "full"],
-  [tallShard(28, 44, -14, 8, 4), "deep"],
-  [tallShard(44, 64, 86, 116, -4), "charHi"],
-];
+type Geometry = { cx: number; cy: number; reachX: number; reachY: number };
 
 /**
- * The cover's tick texture: small crosses scattered over the plane where it is
- * already dark. They sit at a low opacity and never near the top, where the
- * colour is doing the work on its own.
+ * A wide window and a phone need their own fields, not one field cropped.
+ *
+ * `slice` scales to cover, and on a 390-wide phone that means the 160-unit-wide
+ * field is drawn some 1350 units across and clipped to its middle sliver —
+ * which is precisely the point where every ray converges. The mass stopped
+ * reading as fragments and started reading as a pinwheel. The phone gets a
+ * viewBox in its own proportion instead, so the whole break is visible and the
+ * silver still surrounds it.
  */
-const TICKS: [x: number, y: number, r: number][] = [
-  [12, 62, 1.6],
-  [20, 71, 1.2],
-  [8, 78, 1.4],
-  [17, 86, 1.1],
-  [143, 55, 1.6],
-  [151, 64, 1.2],
-  [136, 72, 1.4],
-  [148, 81, 1.1],
-  [128, 88, 1.3],
-];
+const WIDE: Geometry = { cx: 80, cy: 50, reachX: 58, reachY: 42 };
+const TALL: Geometry = { cx: 50, cy: 100, reachX: 46, reachY: 64 };
 
-function Ticks({ scaleX }: { scaleX: number }) {
-  return (
-    <g stroke="currentColor" strokeWidth={0.3} opacity={0.2}>
-      {TICKS.map(([x, y, r], i) => {
-        const cx = x * scaleX;
-        return (
-          <g key={i}>
-            <line x1={cx - r} y1={y - r} x2={cx + r} y2={y + r} />
-            <line x1={cx - r} y1={y + r} x2={cx + r} y2={y - r} />
-          </g>
-        );
-      })}
-    </g>
+type Pt = [number, number];
+
+/**
+ * Corner points of the web, jittered per ray *and* per ring, so that no ring is
+ * a circle and no ray is straight.
+ */
+function pointsFor(g: Geometry): Pt[][] {
+  return RINGS.map((ring, j) =>
+    Array.from({ length: RAYS }, (_, i) => {
+      // Uneven angular spacing, or the rays read as a pinwheel.
+      const angle =
+        ((i + 0.42 * (noise(i, 7) - 0.5)) / RAYS) * Math.PI * 2 + 0.35;
+      // Radial jitter grows with the ring, so the outer edge is the raggedest.
+      const wobble = 1 + (noise(i, j * 3 + 11) - 0.5) * (0.16 + j * 0.11);
+      const r = ring * wobble;
+      return [
+        g.cx + Math.cos(angle) * r * g.reachX,
+        g.cy + Math.sin(angle) * r * g.reachY,
+      ] as Pt;
+    }),
   );
 }
+
+type Shard = { points: string; fill: keyof Palette; opacity: number };
+
+function buildShards(g: Geometry): Shard[] {
+  const POINTS = pointsFor(g);
+  const out: Shard[] = [];
+
+  // The innermost ring closes on the centre as triangles, so the mass has a
+  // core rather than a hole.
+  for (let i = 0; i < RAYS; i++) {
+    const a = POINTS[0][i];
+    const b = POINTS[0][(i + 1) % RAYS];
+    const n = noise(i, 91);
+    out.push({
+      points: `${fx(g.cx)},${fx(g.cy)} ${fx(a[0])},${fx(a[1])} ${fx(b[0])},${fx(b[1])}`,
+      fill: n > 0.62 ? "hot" : n > 0.3 ? "red" : "ink",
+      opacity: 1,
+    });
+  }
+
+  for (let j = 0; j < RINGS.length - 1; j++) {
+    for (let i = 0; i < RAYS; i++) {
+      const k = (i + 1) % RAYS;
+      const a = POINTS[j][i];
+      const b = POINTS[j][k];
+      const c = POINTS[j + 1][k];
+      const d = POINTS[j + 1][i];
+      const n = noise(i * 3 + 1, j * 7 + 2);
+
+      // Red concentrates at the core and gives way to black on the way out, so
+      // the impact reads as hot in the middle and cooling as it travels.
+      const redBias = 0.62 - j * 0.13;
+      let fill: keyof Palette;
+      if (n < redBias * 0.28) fill = "hot";
+      else if (n < redBias * 0.72) fill = "red";
+      else if (n < redBias) fill = "redDeep";
+      else if (n < redBias + (1 - redBias) * 0.55) fill = "ink";
+      else if (n < redBias + (1 - redBias) * 0.86) fill = "inkSoft";
+      else fill = "silver";
+
+      // Only the last ring fades, and unevenly — a straight alpha ramp would
+      // read as a soft vignette rather than as fragments thrown clear.
+      const outer = j === RINGS.length - 2;
+      const opacity = outer ? Number((0.16 + noise(i, 13) * 0.5).toFixed(3)) : 1;
+
+      out.push({
+        points: `${fx(a[0])},${fx(a[1])} ${fx(b[0])},${fx(b[1])} ` +
+          `${fx(c[0])},${fx(c[1])} ${fx(d[0])},${fx(d[1])}`,
+        fill,
+        opacity,
+      });
+    }
+  }
+  return out;
+}
+
+const WIDE_SHARDS = buildShards(WIDE);
+const TALL_SHARDS = buildShards(TALL);
+
+/**
+ * The cover's brushed sheen: long, near-horizontal light streaks drawn over the
+ * silver but under the shards, so the mass stays the subject.
+ */
+const SHEEN: [x1: number, y1: number, x2: number, y2: number, w: number][] = [
+  [-10, 18, 170, 4, 1.1],
+  [-10, 30, 170, 12, 0.6],
+  [-10, 64, 170, 46, 0.9],
+  [-10, 82, 170, 60, 0.5],
+  [-10, 95, 170, 74, 1.3],
+];
+
+/**
+ * The silver itself. Kept here rather than in CSS because the page's ground and
+ * the SVG's ground have to be the same colour — anywhere they differ shows up
+ * as a seam when the backdrop repaints.
+ */
+export const SILVER_GROUND =
+  "radial-gradient(120% 90% at 50% -10%, #ffffff 0%, rgba(255,255,255,0) 62%)," +
+  "linear-gradient(158deg, #f6f7f9 0%, #dfe2e8 34%, #f2f3f6 56%, #cfd3db 78%, #e6e8ed 100%)";
 
 function Field({
   shards,
   viewBox,
+  sheenSpan,
+  sheenRise,
   palette,
-  tickScaleX,
 }: {
   shards: Shard[];
   viewBox: string;
+  /** The viewBox's width and height, so the sheen is stated once in the wide
+   *  field's terms and stretched to whichever field is drawing it. */
+  sheenSpan: number;
+  sheenRise: number;
   palette: Palette;
-  tickScaleX: number;
 }) {
   return (
     <svg
       viewBox={viewBox}
       preserveAspectRatio="xMidYMid slice"
       className="h-full w-full"
-      style={{ color: palette.dusk }}
       aria-hidden
     >
-      {shards.map(([points, fill, opacity], i) => (
-        <polygon key={i} points={points} fill={palette[fill]} opacity={opacity} />
-      ))}
-      <Ticks scaleX={tickScaleX} />
+      <g stroke="#ffffff" strokeLinecap="round">
+        {SHEEN.map(([x1, y1, x2, y2, w], i) => (
+          <line
+            key={i}
+            x1={(x1 / 160) * sheenSpan}
+            y1={(y1 / 100) * sheenRise}
+            x2={(x2 / 160) * sheenSpan}
+            y2={(y2 / 100) * sheenRise}
+            strokeWidth={w}
+            opacity={0.55}
+          />
+        ))}
+      </g>
+      {/*
+       * The mass sits directly behind the content column, so at full strength
+       * its black facets and the page's dark ink cancel each other out and
+       * labels like the spread disappear. Held back toward the silver, it still
+       * reads as red and black — it just stops competing with type.
+       */}
+      <g opacity={0.55}>
+        {shards.map((s, i) => (
+          <polygon
+            key={i}
+            points={s.points}
+            fill={palette[s.fill]}
+            opacity={s.opacity}
+          />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -240,22 +257,24 @@ export default function SportShards({ accent }: { accent: string }) {
     <div
       aria-hidden
       className="pointer-events-none fixed inset-0 -z-10"
-      style={{ background: palette.ground }}
+      style={{ background: SILVER_GROUND }}
     >
       <div className="hidden h-full w-full sm:block">
         <Field
-          shards={WIDE}
+          shards={WIDE_SHARDS}
           viewBox="0 0 160 100"
+          sheenSpan={160}
+          sheenRise={100}
           palette={palette}
-          tickScaleX={1}
         />
       </div>
       <div className="h-full w-full sm:hidden">
         <Field
-          shards={TALL}
+          shards={TALL_SHARDS}
           viewBox="0 0 100 200"
+          sheenSpan={100}
+          sheenRise={200}
           palette={palette}
-          tickScaleX={0.625}
         />
       </div>
     </div>

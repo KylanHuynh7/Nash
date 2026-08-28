@@ -267,11 +267,11 @@ export default function RunTab({
       <div className="space-y-6">
         <section>
           <div className="mb-2.5 flex items-baseline justify-between">
-            <h2 className="text-sm font-medium uppercase tracking-wider text-muted">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-ink-soft">
               Who showed up
             </h2>
             <div className="flex items-center gap-3 text-sm">
-              <span className="font-mono tabular-nums text-muted">
+              <span className="font-mono tabular-nums text-ink-soft">
                 {here.length}/{roster.length}
               </span>
               <button
@@ -329,11 +329,11 @@ export default function RunTab({
         {here.length >= 2 && (
           <section>
             <div className="mb-2.5 flex items-baseline justify-between">
-              <h2 className="text-sm font-medium uppercase tracking-wider text-muted">
+              <h2 className="text-sm font-medium uppercase tracking-wider text-ink-soft">
                 On the {config.surface}
               </h2>
               <div className="flex items-center gap-3 text-sm">
-                <span className="font-mono tabular-nums text-muted">
+                <span className="font-mono tabular-nums text-ink-soft">
                   {onCourt.length}/{here.length}
                 </span>
                 <button
@@ -348,7 +348,7 @@ export default function RunTab({
                       setPlaying(new Set());
                       clearResult();
                     }}
-                    className="text-muted hover:text-foreground"
+                    className="text-ink-soft hover:text-ink"
                   >
                     Clear
                   </button>
@@ -382,7 +382,7 @@ export default function RunTab({
                     {!on && waited > 0 && (
                       <span
                         title={`Sat out ${waited} game${waited > 1 ? "s" : ""}`}
-                        className="rounded bg-amber-100 px-1 font-mono text-[10px] font-semibold text-amber-300"
+                        className="rounded border border-amber-400/50 bg-amber-400/20 px-1 font-mono text-[10px] font-semibold text-amber-200"
                       >
                         {waited}
                       </span>
@@ -401,7 +401,7 @@ export default function RunTab({
                 ? `${perTeam}v${perTeam}`
                 : "Nobody on the court yet"}
             </p>
-            <p className="text-xs text-muted">
+            <p className="text-xs text-ink-soft">
               {here.length < 2
                 ? "Tap who showed up"
                 : onCourt.length < 2
@@ -411,7 +411,7 @@ export default function RunTab({
                     : "Everybody plays"}
             </p>
           </div>
-          <span className="font-mono text-2xl tabular-nums text-muted">
+          <span className="font-mono text-2xl tabular-nums text-ink-soft">
             {onCourt.length}
           </span>
         </section>
@@ -419,7 +419,7 @@ export default function RunTab({
         <section>
           <button
             onClick={() => setShowRules((v) => !v)}
-            className="flex w-full items-center justify-between py-1 text-sm text-muted hover:text-foreground"
+            className="flex w-full items-center justify-between py-1 text-sm text-ink-soft hover:text-ink"
           >
             <span>Pairing rules{rules.length > 0 && ` · ${rules.length}`}</span>
             <span aria-hidden>{showRules ? "−" : "+"}</span>
@@ -428,7 +428,7 @@ export default function RunTab({
           {showRules && (
             <div className="mt-2 space-y-2 rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-card)]">
               {rules.length === 0 && (
-                <p className="px-1 py-1 text-xs leading-relaxed text-muted">
+                <p className="px-1 py-1 text-xs leading-relaxed text-ink-soft">
                   Force two people onto the same team, or keep them apart. Rules
                   only apply when both players are marked here.
                 </p>
@@ -443,7 +443,7 @@ export default function RunTab({
                   >
                     <span className="flex-1">
                       {a?.name}{" "}
-                      <span className="text-muted">
+                      <span className="text-ink-soft">
                         {rule.kind === "together" ? "with" : "vs"}
                       </span>{" "}
                       {b?.name}
@@ -454,7 +454,7 @@ export default function RunTab({
                         setResult(null);
                       }}
                       aria-label="Remove rule"
-                      className="px-1 text-muted hover:text-rose-400"
+                      className="px-1 text-ink-soft hover:text-rose-400"
                     >
                       ✕
                     </button>
@@ -496,7 +496,7 @@ export default function RunTab({
         {result && board && (
           <section className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">
+              <span className="text-ink-soft">
                 Spread{" "}
                 <span
                   className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-400" : liveSpread <= 3 ? "text-amber-400" : "text-rose-400"}`}
@@ -549,14 +549,14 @@ export default function RunTab({
             </div>
 
             {shortCritical > 0 && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="rounded-xl border border-amber-400/40 bg-amber-400/15 px-3 py-2 text-xs text-amber-200">
                 {shortCritical} team{shortCritical > 1 ? "s have" : " has"} no{" "}
                 {criticalLabel}. Mark someone else who can play it.
               </p>
             )}
 
             {result.unmet.length > 0 && !edited && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <p className="rounded-xl border border-amber-400/40 bg-amber-400/15 px-3 py-2 text-xs text-amber-200">
                 Couldn&apos;t satisfy {result.unmet.length} rule
                 {result.unmet.length > 1 ? "s" : ""} with this group.
               </p>
