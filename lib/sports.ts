@@ -232,13 +232,6 @@ export function sportChrome(sport: SportConfig): Record<string, string> {
     "--border-strong": mix(36, "#4a4a59"),
     "--foreground": mix(4, "#ffffff"),
     "--muted": mix(12, "#adb3c4"),
-    // Contained to the top, like a light over the near end of the court,
-    // rather than a wash across the page. Below the fold it is simply dark.
-    "--page-background": [
-      `linear-gradient(180deg, ${mix(62, "transparent")} 0%, ${mix(24, "transparent")} 18%, transparent 46%)`,
-      `radial-gradient(70rem 26rem at 78% -6rem, ${mix(34, "transparent")}, transparent)`,
-      mix(7, "#07070a"),
-    ].join(", "),
   };
 }
 

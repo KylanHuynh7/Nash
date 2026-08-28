@@ -4,6 +4,7 @@ import { getRun } from "@/app/actions";
 import { Rating, teamColor } from "@/components/ui";
 import { buildMatchups } from "@/lib/lineup";
 import { SPORTS, isSportId, sportChrome } from "@/lib/sports";
+import SportShards from "@/components/SportShards";
 
 export default async function RunPage({ params }: PageProps<"/run/[id]">) {
   const { id } = await params;
@@ -31,11 +32,7 @@ export default async function RunPage({ params }: PageProps<"/run/[id]">) {
     >
       {/* Without this the page wears Nash's navy while its cards wear the
           sport's colour — a link out of basketball has to look like basketball. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{ background: sportChrome(config)["--page-background"] }}
-      />
+      <SportShards accent={config.accent} />
 
       <header className="mb-6">
         <Link

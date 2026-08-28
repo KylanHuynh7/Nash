@@ -7,6 +7,7 @@ import PasscodeGate from "@/components/PasscodeGate";
 import PlayerCard from "@/components/PlayerCard";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
+import SportShards from "@/components/SportShards";
 import { Button, EmptyState, Rating } from "@/components/ui";
 import {
   computeOverall,
@@ -88,11 +89,7 @@ export default function SportApp({
        * this the football page would still sit on a red ground. The sport owns
        * the whole viewport, not just the elements inside it.
        */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{ background: sportChrome(config)["--page-background"] }}
-      />
+      <SportShards accent={config.accent} />
 
       <header className="mb-5 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
