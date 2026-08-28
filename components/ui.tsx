@@ -53,30 +53,39 @@ export function ratingBar(overall: number): string {
  * Per-team identity colours — easier to call out than "team one". Home red and
  * away blue first, the way a matchup screen splits two sides.
  */
+/*
+ * `outline` is written out per team rather than composed, because Tailwind only
+ * generates classes it can see as literal strings - an `outline-${colour}-400`
+ * silently produces nothing, which is how the mobile wordmark ended up at 16px.
+ */
 export const TEAM_COLORS = [
   {
     label: "Red",
     dot: "bg-red-500",
     chip: "bg-red-500/15 text-red-300 border-red-400/40",
     ring: "border-red-400/40",
+    outline: "outline-red-400/80",
   },
   {
     label: "Blue",
     dot: "bg-sky-400",
     chip: "bg-sky-400/15 text-sky-300 border-sky-400/40",
     ring: "border-sky-400/40",
+    outline: "outline-sky-400/80",
   },
   {
     label: "Gold",
     dot: "bg-amber-400",
     chip: "bg-amber-400/15 text-amber-300 border-amber-400/40",
     ring: "border-amber-400/40",
+    outline: "outline-amber-400/80",
   },
   {
     label: "Violet",
     dot: "bg-violet-400",
     chip: "bg-violet-400/15 text-violet-300 border-violet-400/40",
     ring: "border-violet-400/40",
+    outline: "outline-violet-400/80",
   },
 ] as const;
 

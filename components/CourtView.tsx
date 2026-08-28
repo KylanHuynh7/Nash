@@ -19,10 +19,13 @@ export type SwapState = {
   /** The player waiting for somewhere to go, or null. */
   selectedId: string | null;
   /** Which team he is on, so only his own side lights up. */
+  /** Which side the selected player is on, or null when he is on the bench. */
   selectedTeam: number | null;
-  onSelect: (playerId: string | null, teamIndex: number) => void;
+  onSelect: (playerId: string | null, teamIndex: number | null) => void;
   /** Fires with the spot key tapped, on the selected player's own team. */
   onSwap: (spot: string) => void;
+  /** Trade the selected player with this one - across sides, or with the bench. */
+  onSwapWith: (playerId: string) => void;
 };
 
 export default function CourtView({
@@ -275,15 +278,24 @@ function PlayerSlot({
   const color = teamColor(teamIndex);
 
   const selected = Boolean(swap && swap.selectedId === player?.id);
-  // Only the selected player's own side lights up. A swap across teams changes
-  // who is on which side, which `pinToSpot` does not do and should not pretend
-  // to - it rearranges one lineup.
+
+  /*
+   * Two different things can be tapped, and they are different operations.
+   *
+   * On the selected player's own side, a slot is a place to stand: tapping it
+   * rearranges that lineup and leaves both rosters alone. Empty slots count,
+   * because moving into one displaces nobody.
+   *
+   * On any other side, only an occupied slot is a target, and tapping it
+   * trades the two players. An empty slot over there is not a swap - it would
+   * leave one team a man short - so it stays inert and the move that does that
+   * deliberately is still a drag onto the column.
+   */
+  const own = Boolean(swap?.selectedId) && swap?.selectedTeam === teamIndex;
   const targetable = Boolean(
-    swap &&
-      swap.selectedId &&
-      swap.selectedTeam === teamIndex &&
-      !selected,
+    swap && swap.selectedId && !selected && (own || player !== null),
   );
+  const crossTeam = targetable && !own;
 
   if (!player) {
     // An empty slot is a real destination: moving into it leaves nobody
@@ -323,6 +335,7 @@ function PlayerSlot({
       swap={swap}
       selected={selected}
       targetable={targetable}
+      crossTeam={crossTeam}
     />
   );
 }
@@ -335,6 +348,7 @@ function DraggablePlayer({
   swap,
   selected,
   targetable,
+  crossTeam,
 }: {
   player: BalancePlayer;
   teamIndex: number;
@@ -343,6 +357,7 @@ function DraggablePlayer({
   swap?: SwapState;
   selected: boolean;
   targetable: boolean;
+  crossTeam: boolean;
 }) {
   const color = teamColor(teamIndex);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -354,8 +369,10 @@ function DraggablePlayer({
   // a drag can share the element without a tap ever firing at the end of a drag.
   function handleClick() {
     if (!swap) return;
-    if (targetable) swap.onSwap(spot);
-    else if (selected) swap.onSelect(null, teamIndex);
+    if (targetable) {
+      if (crossTeam) swap.onSwapWith(player.id);
+      else swap.onSwap(spot);
+    } else if (selected) swap.onSelect(null, teamIndex);
     else swap.onSelect(player.id, teamIndex);
   }
 
@@ -363,10 +380,20 @@ function DraggablePlayer({
   // board, but they are two different things and looked like one at the same
   // ring weight. The one that was picked is filled; the ones that can be tapped
   // are only outlined, and dashed so the difference survives a glance.
+  /*
+   * Three states that have to stay distinguishable at a glance on a phone.
+   *
+   * The one that was picked is filled. Places he can go are only outlined, and
+   * dashed. A target on *another* side is outlined in that side's own colour,
+   * because "rearrange my lineup" and "these two switch teams" are different
+   * enough that they should not look identical.
+   */
   const state = selected
     ? "bg-accent-wash ring-2 ring-accent font-semibold"
     : targetable
-      ? "outline-1 outline-dashed outline-accent/70 hover:bg-accent-wash"
+      ? crossTeam
+        ? `outline-1 outline-dashed ${color.outline} hover:bg-sunken`
+        : "outline-1 outline-dashed outline-accent/70 hover:bg-accent-wash"
       : "hover:bg-sunken";
 
   return (

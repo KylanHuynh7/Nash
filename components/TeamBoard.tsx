@@ -16,114 +16,22 @@ import {
 } from "@dnd-kit/core";
 import { restrictToWindowEdges } from "@dnd-kit/modifiers";
 import { Rating, teamColor } from "@/components/ui";
-import CourtView from "@/components/CourtView";
+import CourtView, { type SwapState } from "@/components/CourtView";
 import { buildMatchups } from "@/lib/lineup";
+import {
+  BENCH,
+  boardSpread,
+  move,
+  pinToSpot,
+  swap as swapPlayers,
+  teamAverage,
+  teamId,
+  type Board,
+} from "@/lib/board";
 import type { SportConfig } from "@/lib/sports";
 import type { BalancePlayer } from "@/lib/balance";
 
-export type Board = {
-  teams: BalancePlayer[][];
-  bench: BalancePlayer[];
-  /**
-   * Player id -> the id of the spot they were dropped on. Automatic placement
-   * never moves them again — a drag is an instruction, not a suggestion.
-   *
-   * The spot is recorded rather than the position, because several spots can
-   * share one position: dropping a receiver on the right side has to keep him
-   * on the right side, and rewriting his position to the spot key would put a
-   * "wr_l" into a saved run where a real position belongs.
-   */
-  pinned: Record<string, string>;
-};
-
-const BENCH = "bench";
-const teamId = (index: number) => `team-${index}`;
-
-export function teamAverage(players: BalancePlayer[]): number {
-  if (players.length === 0) return 0;
-  const total = players.reduce((sum, p) => sum + p.overall, 0);
-  return Math.round((total / players.length) * 10) / 10;
-}
-
-export function boardSpread(board: Board): number {
-  const averages = board.teams.filter((t) => t.length > 0).map(teamAverage);
-  if (averages.length === 0) return 0;
-  return Math.round((Math.max(...averages) - Math.min(...averages)) * 10) / 10;
-}
-
-function findContainer(board: Board, playerId: string): string | null {
-  for (let i = 0; i < board.teams.length; i++) {
-    if (board.teams[i].some((p) => p.id === playerId)) return teamId(i);
-  }
-  return board.bench.some((p) => p.id === playerId) ? BENCH : null;
-}
-
-function move(board: Board, playerId: string, to: string): Board {
-  const from = findContainer(board, playerId);
-  if (!from || from === to) return board;
-
-  const all = [...board.teams.flat(), ...board.bench];
-  const player = all.find((p) => p.id === playerId);
-  if (!player) return board;
-
-  const strip = (list: BalancePlayer[]) =>
-    list.filter((p) => p.id !== playerId);
-  const teams = board.teams.map(strip);
-  let bench = strip(board.bench);
-
-  if (to === BENCH) {
-    bench = [...bench, player];
-  } else {
-    const index = Number(to.slice("team-".length));
-    if (!Number.isInteger(index) || !teams[index]) return board;
-    teams[index] = [...teams[index], player].sort(
-      (a, b) => b.overall - a.overall,
-    );
-  }
-
-  // Changing team drops the pin: the spot it referred to was on the old side.
-  const pinned = Object.fromEntries(
-    Object.entries(board.pinned).filter(([id]) => id !== playerId),
-  );
-  return { teams, bench, pinned };
-}
-
-/**
- * Puts a player on the spot they were dropped on and sends whoever was there
- * back to the spot they came from — a straight swap of two players.
- *
- * Position is not consulted and cannot block the move: putting a guard at
- * centre to see him handle a big is the point of dragging, not a mistake to
- * correct. Both ends of the swap get pinned, so automatic placement and the
- * height pass leave the whole board alone afterwards and one drag moves
- * exactly two people.
- */
-function pinToSpot(
-  board: Board,
-  config: SportConfig,
-  playerId: string,
-  spot: string,
-): Board {
-  const teamIndex = board.teams.findIndex((t) =>
-    t.some((p) => p.id === playerId),
-  );
-  // Dropping a benched player onto a spot says nothing about which side he's
-  // joining, so it isn't a move we can make sense of.
-  if (teamIndex === -1) return board;
-
-  const matchups = buildMatchups(config, board.teams, board.pinned);
-  const from = matchups.find((m) => m.players[teamIndex]?.id === playerId);
-  if (!from || from.position === spot) return board;
-
-  const target = matchups.find((m) => m.position === spot);
-  if (!target) return board;
-
-  const pinned = { ...board.pinned, [playerId]: spot };
-  const displaced = target.players[teamIndex];
-  if (displaced) pinned[displaced.id] = from.position;
-
-  return { ...board, pinned };
-}
+export { boardSpread, teamAverage, type Board };
 
 export default function TeamBoard({
   board,
@@ -149,13 +57,21 @@ export default function TeamBoard({
    */
   const [selected, setSelected] = useState<{
     id: string;
-    team: number;
+    team: number | null;
   } | null>(null);
 
-  // The selected player may have been regenerated away or moved to the bench.
+  /*
+   * A selection is only live while the player is still where it says he is.
+   * Regenerating rebuilds both sides, and a selection pointing into the old
+   * lineup would light up the wrong slot on the new one. `team: null` means
+   * the bench, which is a valid place to be selected from - picking someone up
+   * off the bench and tapping a player on the floor is a substitution.
+   */
   const selectionLive =
     selected !== null &&
-    board.teams[selected.team]?.some((p) => p.id === selected.id);
+    (selected.team === null
+      ? board.bench.some((p) => p.id === selected.id)
+      : Boolean(board.teams[selected.team]?.some((p) => p.id === selected.id)));
   const live = selectionLive ? selected : null;
 
   // A short press-and-hold on touch keeps the page scrollable; on mouse a few
@@ -166,6 +82,34 @@ export default function TeamBoard({
       activationConstraint: { delay: 180, tolerance: 8 },
     }),
   );
+
+  /*
+   * One tap picks a player up, the second says where he goes. What the second
+   * tap means depends on what it lands on:
+   *
+   *  - a spot on his own side          rearrange that lineup (pinToSpot)
+   *  - a player on another side        the two switch sides (swap)
+   *  - a player on the bench           a substitution (swap)
+   *
+   * Only the first changes a lineup without changing who is on which team,
+   * which is why it stays a separate operation rather than a special case.
+   */
+  const swapState = {
+    selectedId: live?.id ?? null,
+    selectedTeam: live?.team ?? null,
+    onSelect: (playerId: string | null, teamIndex: number | null) =>
+      setSelected(playerId ? { id: playerId, team: teamIndex } : null),
+    onSwap: (spot: string) => {
+      if (!live || live.team === null) return;
+      onChange(pinToSpot(board, config, live.id, spot));
+      setSelected(null);
+    },
+    onSwapWith: (playerId: string) => {
+      if (!live) return;
+      onChange(swapPlayers(board, config, live.id, playerId));
+      setSelected(null);
+    },
+  };
 
   const sizes = board.teams.map((t) => t.length);
   const uneven =
@@ -204,24 +148,16 @@ export default function TeamBoard({
       onDragEnd={handleEnd}
       onDragCancel={() => setDragging(null)}
     >
-      {view === "court" && <SwapHint active={Boolean(live)} />}
+      {view === "court" && (
+        <SwapHint active={Boolean(live)} fromBench={live?.team === null} />
+      )}
 
       {view === "court" ? (
         <CourtView
           matchups={buildMatchups(config, board.teams, board.pinned)}
           teamCount={board.teams.length}
           config={config}
-          swap={{
-            selectedId: live?.id ?? null,
-            selectedTeam: live?.team ?? null,
-            onSelect: (playerId, teamIndex) =>
-              setSelected(playerId ? { id: playerId, team: teamIndex } : null),
-            onSwap: (spot) => {
-              if (!live) return;
-              onChange(pinToSpot(board, config, live.id, spot));
-              setSelected(null);
-            },
-          }}
+          swap={swapState}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -246,6 +182,8 @@ export default function TeamBoard({
         players={board.bench}
         positionLabel={positionLabel}
         muted
+        swap={swapState}
+        teamIndex={null}
       />
 
       <DragOverlay dropAnimation={null}>
@@ -272,7 +210,13 @@ export default function TeamBoard({
  * someone happens to tap a player, and the people using this are standing on a
  * court deciding whether to bother.
  */
-function SwapHint({ active }: { active: boolean }) {
+function SwapHint({
+  active,
+  fromBench,
+}: {
+  active: boolean;
+  fromBench: boolean;
+}) {
   return (
     <p
       className={`mb-2 text-center text-xs transition ${
@@ -280,8 +224,10 @@ function SwapHint({ active }: { active: boolean }) {
       }`}
     >
       {active
-        ? "Now tap where he should go — or tap him again to cancel."
-        : "Tap a player, then tap a spot on his own team to swap them."}
+        ? fromBench
+          ? "Now tap whoever he comes on for — or tap him again to cancel."
+          : "Now tap a spot on his own side, a player on the other, or someone on the bench."
+        : "Tap a player, then tap where he should go. Sides keep their size."}
     </p>
   );
 }
@@ -295,6 +241,8 @@ function Column({
   muted,
   flagSize,
   colorIndex,
+  swap,
+  teamIndex,
 }: {
   id: string;
   title: string;
@@ -304,6 +252,9 @@ function Column({
   muted?: boolean;
   flagSize?: boolean;
   colorIndex?: number;
+  swap?: SwapState;
+  /** Which side this column is, or null for the bench. */
+  teamIndex?: number | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const average = useMemo(() => teamAverage(players), [players]);
@@ -348,7 +299,13 @@ function Column({
       ) : (
         <ul className="space-y-1">
           {players.map((p) => (
-            <PlayerRow key={p.id} player={p} positionLabel={positionLabel} />
+            <PlayerRow
+              key={p.id}
+              player={p}
+              positionLabel={positionLabel}
+              swap={swap}
+              teamIndex={teamIndex ?? null}
+            />
           ))}
         </ul>
       )}
@@ -359,23 +316,62 @@ function Column({
 function PlayerRow({
   player,
   positionLabel,
+  swap,
+  teamIndex,
 }: {
   player: BalancePlayer;
   positionLabel: Map<string, string>;
+  swap?: SwapState;
+  teamIndex: number | null;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: player.id,
   });
+
+  const selected = Boolean(swap && swap.selectedId === player.id);
+  // Anyone not on the selected player's own side is someone he can switch
+  // with. His own side is a lineup rearrangement, which happens on the court
+  // by tapping a spot rather than by tapping a team-mate.
+  const targetable = Boolean(
+    swap && swap.selectedId && !selected && swap.selectedTeam !== teamIndex,
+  );
+
+  function handleClick() {
+    if (!swap) return;
+    if (targetable) swap.onSwapWith(player.id);
+    else if (selected) swap.onSelect(null, teamIndex);
+    else swap.onSelect(player.id, teamIndex);
+  }
+
+  const state = selected
+    ? "bg-accent-wash ring-2 ring-accent font-semibold"
+    : targetable
+      ? "outline-1 outline-dashed outline-accent/70 hover:bg-accent-wash"
+      : "hover:bg-sunken";
 
   return (
     <li
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
+      role={swap ? "button" : undefined}
+      tabIndex={swap ? 0 : undefined}
+      aria-pressed={swap ? selected : undefined}
+      onKeyDown={
+        swap
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleClick();
+              }
+            }
+          : undefined
+      }
       className={`flex touch-none items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition ${
         isDragging
           ? "opacity-30"
-          : "cursor-grab hover:bg-sunken active:cursor-grabbing"
+          : `cursor-grab active:cursor-grabbing ${state}`
       }`}
     >
       <span className="w-8 shrink-0 font-mono text-[10px] uppercase text-muted">
