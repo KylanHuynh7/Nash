@@ -126,7 +126,6 @@ export const SPORTS: Record<SportId, SportConfig> = {
   },
   football: {
     id: "football",
-    comingSoon: true,
     label: "Football",
     emoji: "\u{1F3C8}",
     defaultTeams: 2,
@@ -224,6 +223,10 @@ export function sportChrome(sport: SportConfig): Record<string, string> {
     "--accent-strong": mix(72, "white"),
     "--accent-wash": mix(15, "#0e1014"),
     "--accent-line": mix(42, "#0e1014"),
+    // The accent as it has to appear on the page's silver ground rather than
+    // on a dark card. Full-strength green reads at about 2.6:1 out there, so
+    // controls like "Clear" and "Auto-pick" were barely text at all.
+    "--accent-ink": mix(72, "#07070a"),
     "--background": mix(7, "#07070a"),
     "--surface": mix(9, "#191920"),
     "--surface-sunken": mix(7, "#101014"),

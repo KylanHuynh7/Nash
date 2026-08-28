@@ -283,7 +283,7 @@ export default function RunTab({
                   if (all) setPlaying(new Set());
                   clearResult();
                 }}
-                className="text-accent hover:underline"
+                className="text-accent-ink hover:underline"
               >
                 {here.length === roster.length ? "Clear" : "All"}
               </button>
@@ -338,7 +338,7 @@ export default function RunTab({
                 </span>
                 <button
                   onClick={autoPick}
-                  className="text-accent hover:underline"
+                  className="text-accent-ink hover:underline"
                 >
                   Auto-pick {courtCap}
                 </button>
@@ -499,12 +499,12 @@ export default function RunTab({
               <span className="text-ink-soft">
                 Spread{" "}
                 <span
-                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-400" : liveSpread <= 3 ? "text-amber-400" : "text-rose-400"}`}
+                  className={`font-mono tabular-nums ${liveSpread <= 1 ? "text-emerald-700" : liveSpread <= 3 ? "text-amber-700" : "text-rose-700"}`}
                 >
                   {liveSpread.toFixed(1)}
                 </span>
                 {edited && (
-                  <span className="ml-2 text-xs text-accent">edited</span>
+                  <span className="ml-2 text-xs text-accent-ink">edited</span>
                 )}
               </span>
               <div className="flex items-center gap-3">
@@ -541,7 +541,7 @@ export default function RunTab({
                 )}
                 <button
                   onClick={() => generate(seed + 1)}
-                  className="text-accent hover:underline"
+                  className="text-accent-ink hover:underline"
                 >
                   Reshuffle
                 </button>
