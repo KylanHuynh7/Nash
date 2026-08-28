@@ -20,14 +20,58 @@ config entry, not a new app.
 | | |
 |---|---|
 | Framework | Next.js 16 (App Router, Turbopack), React 19 |
-| Styling | Tailwind v4, single dark theme (NBA 2K-inspired) |
+| Styling | Tailwind v4, single dark theme per sport |
 | Database | Neon Postgres via Vercel Marketplace |
 | ORM | Drizzle |
 | Drag & drop | `@dnd-kit/core` |
+| Repo | `github.com/KylanHuynh7/Nash` (`origin/main`) |
 | Hosting | Vercel — project `run-it-back`, **not yet deployed** |
 
-Local: `npm run dev` → http://localhost:3000. On the same Wi-Fi, a phone can
-reach it at the Network address `next dev` prints.
+Local: `npm run dev` → http://localhost:3000. On the same Wi-Fi a phone reaches
+it at the Network address `next dev` prints (currently `192.168.12.176:3000` —
+the router reassigns this, so re-read it rather than trusting this line).
+
+`devIndicators: false` in `next.config.ts` — the dev-route badge sits bottom-left
+over the roster and court cards, and this gets demoed off `next dev` on a phone.
+
+### The directory was renamed
+
+`~/Desktop/lastDance` → `~/Desktop/Nash` mid-session. Anything referring to the
+old path is stale.
+
+---
+
+## Where things live
+
+```
+app/
+  page.tsx            Landing: shield-palette shard collage, sport tiles
+  [sport]/page.tsx    Server shell; loads roster + edit access
+  run/[id]/page.tsx   Shared run (server component, no client bundle)
+  actions.ts          Server actions: roster, save/remove, runs, passcode
+  globals.css         Root tokens, .figure/.metal/.eyebrow/.cut helpers
+components/
+  SportApp.tsx        Tabs, roster list, editor/card orchestration, sport chrome
+  RunTab.tsx          Three-stage flow, generate, winner-stays-on, StageGuide
+  TeamBoard.tsx       DnD context, board mutations (move / pinToSpot)
+  CourtView.tsx       Court/field rendering only — placement logic lives in lib
+  PlayerCard.tsx      Read-only ratings view (no passcode)
+  PlayerEditor.tsx    Sliders, gated behind the passcode
+  PasscodeGate.tsx    Unlock sheet
+  ShardField.tsx      Landing-page SVG backdrop
+  ui.tsx              Rating, ratingTone, ratingBar, TEAM_COLORS, Button
+lib/
+  sports.ts           SPORTS config, computeOverall, sportChrome
+  lineup.ts           buildMatchups + height settling (pure, server-safe)
+  balance.ts          The balancer
+  edit-auth.ts        Server-side passcode check
+scripts/              .mts, sport-aware — see Scripts below
+db/                   Drizzle schema + client
+```
+
+**`lib/lineup.ts` was extracted from `CourtView.tsx`** so the share page (a
+server component) can lay out matchups without pulling a client bundle with it.
+Don't move it back.
 
 ---
 
@@ -160,6 +204,10 @@ The app used to choose who sits. It doesn't any more — that's the user's call,
 and auto-pick is a convenience rather than a rule. Waiting players carry a badge
 showing how many games they've sat.
 
+Before teams exist, the second column shows the three stages and where you are
+(`StageGuide` in `RunTab.tsx`). It used to be an empty dashed box taking 400px of
+every laptop load.
+
 ### Court / field view
 
 Both teams stacked at each of five spots, so a game reads as five matchups
@@ -170,8 +218,11 @@ The advantage delta carries **three independent signals** so it can't be read
 backwards: it sits on the row of the player who holds it, renders in that team's
 colour, and the bar underneath names the team outright.
 
-**Placement rules:**
+**Placement rules** (`lib/lineup.ts`):
 - Stated position first; leftovers fill open spots
+- A spot may name the `position` that claims it, so several spots can share one
+  — football's three receiver spots are all `wr`. Defaults to the spot's own key,
+  which is why basketball never states it.
 - A **height-settling pass** stops a 5'5" guard landing at centre, with a **3"
   tolerance**. It only ever moves a player *it* placed — someone standing at the
   position he asked for is left alone. Settling everyone was what made a stated
@@ -181,8 +232,8 @@ colour, and the bar underneath names the team outright.
   the spot he came from. One drag moves exactly two people, position is never
   consulted, and nothing else on the board re-derives — a guard can be put at
   centre to see him handle a big, which is the point of dragging. Pins record
-  the *spot*, not the position, so several spots can share one position and a
-  drag never rewrites roster data. Pins clear on regenerate.
+  the *spot*, not the position, so a drag never rewrites roster data. Pins clear
+  on regenerate.
 
 ### Winner stays on
 
@@ -193,9 +244,16 @@ Challengers are **not** re-balanced against the holders — that isn't the rule.
 The spread reading tells you how lopsided it came out; Reshuffle is there if you
 want to even it up, at the cost of breaking the chain.
 
-### Editing is passcode-gated
+### Viewing vs editing
 
-Anyone can view and build teams. Changing ratings needs the shared code.
+Tapping a roster name opens **`PlayerCard`** — all attributes with bars, weights,
+hints, rank in the group, best/weakest flags. **No passcode.** Looking at a
+rating is the common case; the gate belongs on changing one, so "Edit ratings"
+inside the card is the only thing that asks.
+
+Attributes sort by **weight**, not config order — that's the order the overall
+actually cares about. Bars fill across **65–99, not 0–99**, or the floor of the
+group renders as "66% good".
 
 **Verification is server-side** — the cookie holds a hash of the passcode, and
 `assertCanEdit()` runs inside `savePlayer` and `removePlayer` before touching the
@@ -205,61 +263,234 @@ database. A failed attempt pauses briefly to make guessing tedious. With no
 Passcode lives in `.env.local`, which is gitignored. **It still needs setting on
 Vercel before deploying.**
 
-### Other
+### Share links
 
-- Drag between teams or to the bench, with live spread
-- Pairing rules (keep two together / apart)
-- Share links — short id, snapshot of the teams
-- Dark arena theme after NBA 2K — near-black ground, crimson accent, brushed
-  steel on the wordmark, 2K's green-to-red tiers on every rating. Each sport
-  still declares one accent colour and the rest derive from it, but on a dark
-  ground they mix toward the page rather than toward white
-- Responsive: two-pane on laptop, stacked on phone
+Short id, snapshot of the teams. The share page derives its chrome from the
+sport, colours ratings on the same tier scale, and **rebuilds the head-to-head
+matchups from the snapshot's positions** — it used to show two flat lists, which
+loses the whole point of the court view. A real example: spread 0.0, both sides
+averaging 78.2, and Red +20 at power forward against Blue +17 at point guard.
+
+A **team average never gets the rating badge** — tiering a mean on the player
+scale made an even 78 render amber, reading as "weak team" when both sides were
+identical.
+
+---
+
+## Design system
+
+### A sport owns its whole chrome
+
+`sportChrome(config)` in `lib/sports.ts` derives **every** CSS variable from the
+sport's one declared accent — surfaces, borders, text, page gradient. Used by
+`SportApp` and the share page, so a link out of basketball still looks like
+basketball. Basketball is `#e01e37`, football `#16a34a` (placeholder until its
+Madden palette is picked).
+
+Two rules learned the hard way:
+
+- **The accent is a hint in surfaces, not a wash.** Tinting every panel heavily
+  left the ground and the cards at the same value, so nothing read as a card and
+  the page looked unfinished. Panels step up in brightness; the accent goes where
+  it means something — header, active tab, primary button, deltas.
+- **The sport paints its own fixed viewport layer.** `body` reads its gradient
+  from `:root`, so without that the football page sat on a red ground.
+
+The page gradient is **contained to the top**, like a light over the near end of
+the court. Below the fold it is simply dark, which is what gives panels something
+to sit on.
+
+### Ratings
+
+2K's tier colours: emerald 90+, lime 80s, amber 70s, orange high 60s, red at the
+floor. `ratingTone()` for badges (a 15% wash so the number stays readable on
+top); **`ratingBar()` for bars** — solid fills, because a bar has nothing on top
+of it and the wash was nearly invisible.
+
+Teams are **red and blue**, home and away.
+
+### Landing page (`ShardField.tsx`)
+
+White-blue-red only — the NBA/NFL shield palette. A sport's own colour belongs
+to its own page. Composed after the 2K covers: one plane, broken.
+
+Five attempts. The first three are kept because each names a trap, but **the
+current design contradicts two of them on purpose** — read to the end before
+reviving any of it.
+
+1. **Independently placed rectangles read as confetti**, not shatter, however
+   many you scatter. Neighbouring fragments have to share edges.
+2. Attempt 1's fix was to draw the fractures *last*, as continuous white slivers
+   cutting every colour underneath. Those had to be **opaque** — a translucent
+   sliver reads as tape laid over the art rather than a break in it.
+3. **Two perpendicular families of cracks spanning edge to edge read as plaid.**
+   They were fanned from two off-canvas impacts, some stopping partway.
+
+Then, reviewed against the 2K22 cover, two things were wrong:
+
+4. **The white slivers broke the palette.** The shield is red, white and blue,
+   so drawn white reads as a fourth element competing with the ground rather
+   than as the ground. They are gone. Shared edges now come from bands being
+   **flush** — one band's edge *is* its neighbour's — which satisfies finding 1
+   without drawing anything. **Don't reintroduce the cracks to fix confetti;
+   tile the bands instead.**
+5. **The two masses leaned against each other to "collide"**, which read as a
+   chevron aimed at the middle. **Every long edge now leans the same way — a
+   `\`, down and to the right.** One lean, the whole canvas, both breakpoints.
+
+The rule that replaced "neither colour keeps to its own half": **a colour stays
+in its own territory, and the clash lives at the border.** Opposing-colour
+fragments are only ever taken from the **two innermost bands** — the ones
+against the white corridor. A red wedge stranded at the far left of the blue
+field reads as a stray, not as a collision.
+
+**Pure white was the actual problem, not the corridor's width.** The mass used
+to end on `BLUE_PALE`/`RED_PALE` and then jump straight to `#ffffff`, so the
+ground read as a wall rather than as the same plane continuing — and against
+maximum contrast, every fragment near the border looked misplaced no matter
+where it sat. Each mass now **ramps into the ground** through two near-white
+steps (`*_MIST`, `*_HAZE`), and the ground itself is `#f3f6fb` rather than pure
+white, which was the brightest thing on the page by some margin.
+
+The ramp is also what narrowed the empty middle. **Moving the hard boundaries
+inward was not available**: content measures **x 48–112, y 29.7–67.9** in wide
+viewBox units (measured, not eyeballed — `getClientRects` on the text nodes,
+since the block boxes are full-width and useless here), and at this lean the
+walls already sit within a unit or two of the cards. The haze steps can cross
+that line because they're faint enough to pass behind a dark card invisibly.
+If the corridor ever needs to narrow further, add ramp steps — don't move the
+walls, and don't reduce the lean either: a smaller lean buys room on the blue
+side and gives the same amount back on the red.
+
+Fragments are **band-aligned and opaque**. A fragment replaces a *segment of a
+band*, so its long edges are that band's own edges and only its end cuts are
+free (`skew` offsets them so the breaks aren't level). Edges that cut *across*
+band boundaries, or any translucency, make the fragment read as a pane laid on
+top of the plane instead of a break in it — that was the first thing wrong with
+attempt 4.
+
+**Two compositions swapped at the breakpoint:** vertical bands eat the whole
+width of a phone and leave nothing to put words on, so on mobile they run
+horizontally and crowd the top and bottom. Both keep the middle clear. On the
+tall composition the same `\` means the **right end of each band sits lower**.
+
+Geometry is generated, not hand-written: `wx`/`ty` place a line, `wideBand`/
+`tallBand` fill between two of them, `wideShard`/`tallShard` cut a segment out.
+Editing the composition means changing numbers in the band lists, not polygon
+strings — the old version's hand-tuned `points` were the reason the lean was
+inconsistent in the first place.
+
+### Mobile
+
+Verified at 390×844 across landing, run tab, roster, player card, court view and
+share page: **no horizontal overflow anywhere**, court fits with all five matchup
+cards readable, share page stacks.
+
+Two notes for whoever tests next:
+
+- A fullPage screenshot shows a false seam where the `fixed` background layer
+  ends. Scroll a real viewport before believing it.
+- **Arbitrary Tailwind values can silently fail.** `text-[3.75rem]` did not
+  generate and the wordmark rendered at 16px on phones — invisible on desktop
+  because the `sm:` variant was fine. Measure computed styles, don't eyeball.
 
 ---
 
 ## Scripts
 
-All need env vars, which Next loads automatically but plain node does not:
+All are `.mts` (run with `tsx`) and **sport-aware** — they read attributes,
+weights, positions and the scale from `lib/sports.ts`, so adding a sport there is
+enough. They need env vars, which Next loads automatically but node does not.
 
 ```bash
-# Apply a rated profile (creates the player if new)
-npx dotenv -e .env.local -- node scripts/rate.mjs "Name" pg 88 84 90 86 78 82 "5'11\""
+# Apply one rated profile (creates the player if new). Attributes are NAMED,
+# not positional — entering six numbers in config order 17 times is where a
+# silent transposition hides.
+npx dotenv -e .env.local -- npx tsx scripts/rate.mts basketball "Victor" pg \
+  shooting=87 finishing=84 playmaking=88 defense=87 rebounding=79 \
+  athleticism=84 height=5'11"
 
-# Ratings CSV for collecting second opinions
-npx dotenv -e .env.local -- node scripts/export-csv.mjs > ratings.csv
+# Apply a whole roster from CSV (header names the columns)
+npx dotenv -e .env.local -- npx tsx scripts/rate.mts football --file ratings.csv
 
-# Blind draft board — names only, shuffled. Send this BEFORE the ratings CSV
-npx dotenv -e .env.local -- node scripts/draft-sheet.mjs > draft-sheet.csv
+# Ratings CSV for second opinions. Output is valid `rate --file` input, so a
+# marked-up sheet feeds straight back.
+npx dotenv -e .env.local -- npx tsx scripts/export-csv.mts basketball > ratings.csv
 
-# Demo roster helpers
+# Blind draft board — names only, shuffled. Send BEFORE the ratings CSV.
+npx dotenv -e .env.local -- npx tsx scripts/draft-sheet.mts basketball > draft-sheet.csv
+
+# Demo roster helpers (still .mjs, basketball-only)
 npx dotenv -e .env.local -- node scripts/seed.mjs [--clear]
 
 # Sanity-check the balancer
 npx tsx scripts/balance-check.ts
 ```
 
+Out-of-scale values are **rejected, not clamped** — a 45 is a mistake about the
+scale, and quietly rewriting it to 65 hides that. Height only writes when given,
+so a football entry can't blank a height set from basketball.
+
+Round-trip verified: export all 17 basketball profiles → re-apply → re-export is
+byte-identical.
+
 ---
 
 ## Next steps
 
-### 1. Football ratings (step 2, agreed)
+### 1. Football ratings — the actual next task
 
-The page is built; every player carries a flat 80. Needs:
+The page is built; every player carries a flat 80 and everyone is `wr`.
 
-- **Positions assigned.** Everyone is currently WR, which is why the page warns
-  "2 teams have no quarterback" — correct behaviour, wrong data.
-- **A football questionnaire.** Different from basketball: hands, speed,
-  coverage, routes, IQ, throwing.
-- **Who can actually throw** is the question that decides games.
-
-Format is **5v5 two-hand touch**: QB + 3 WR + 1 TE, no offensive line.
-Positions are QB / TE / WR / RUSH.
+Format is **5v5 two-hand touch**, positions **QB / TE / WR / SLOT**. There is no
+run game and no designated rusher — `rush` was removed. The slot is the closest
+thing to a back (short routes run as if he came out of the backfield), which
+makes it a role of its own rather than a third receiver.
 
 Throwing is deliberately weighted lowest (0.7) — only one player throws per
 possession, so weighting it heavily would over-rate a pocket passer who can't
 run or cover. Teams get a thrower through the **QB position spread** instead,
 and `criticalPosition: "qb"` surfaces a warning when the group can't cover it.
+
+**The questionnaire is written** (delivered in chat, deliberately not kept as a
+file). Same three-pass method as basketball. Q0 is the anchor — "what round does
+he go in a 5v5 football draft" — answered for all 17 *before* anything else,
+because basketball order is not football order. Then ten behavioural questions,
+four of the six attributes getting a primary question that sets a band plus a
+second that adjusts it:
+
+| | Primary | Adjuster |
+|---|---|---|
+| Throwing ·0.70 | QB rolls an ankle — how do you feel? | — |
+| Hands ·1.15 | Wide open, does it stick? | Contested catch in the endzone |
+| Speed ·1.10 | Where does he finish in a 40? | Can he actually get behind people? |
+| Routes ·1.05 | Open in three yards, or needs the play to break? | Catch-and-go on the short route |
+| Coverage ·1.10 | Who guards their best guy? | Has he taken the ball away? |
+| IQ ·0.90 | Scramble drill + does he know who he has? | — |
+
+Bands: 93–99 best here, 85–92 clearly above, 76–84 average, 69–75 below but
+functional, 65–68 floor.
+
+Positions come out of the answers, not preference: **QB** from the throwing
+question, **TE** from height + contested catch, **WR** from the speed pair,
+**SLOT** from the short-route question.
+
+The contested-catch question is answered about **hands and willingness, not
+size** — height already lives on the roster and already drives field placement,
+so scoring it there counts the same inch twice.
+
+**Predictions written before the data**, so they get checked rather than
+rationalised after: hands and routes should correlate 0.85+ (both are "can he
+play receiver", asked twice, 2.20 of the 6.00 total weight); coverage, speed and
+throwing should be the independent axes; throwing will read 65 for ~13 of 17
+while eating 11.7% of the weight, which will bunch the bottom of the football
+board tighter than basketball's.
+
+**Still unanswered: how does the QB get pressured?** If there is a rush, pass
+rush is a real skill and none of the ten questions measures it.
+
+Also open: nothing captures **conditioning**. Basketball weights athleticism 1.25
+explicitly for "still going at 9-9"; football's `speed` is hinted as pure burst.
 
 ### 2. Collect second opinions
 
@@ -289,11 +520,46 @@ circular and is how these systems drift.
 
 ### 4. Deploy
 
-Not done, and deliberately so. Before deploying:
+Not done. `vercel` CLI 59.6.2 is installed and the repo is linked to project
+`run-it-back`. Before deploying:
 
-- Set `EDIT_PASSCODE` in Vercel project env
+- Set `EDIT_PASSCODE` in Vercel project env — **without it, anyone with the link
+  can change ratings**
 - Confirm the Neon integration's `DATABASE_URL` is on production
 - Decide whether the link is shared as-is or gated further
+
+**Demoing off localhost works but is fragile**: laptop must be awake with
+`npm run dev` running, phones must be on the same Wi-Fi, the router can reassign
+the LAN IP, and it serves an unoptimised dev build. The sleep timer is 1 minute —
+run `caffeinate -d` if going that route.
+
+### 5. Tests (not started, worth doing)
+
+Several throwaway verification scripts were written and deleted across sessions:
+placement/drag correctness, the two-player swap, the CSV round-trip. A balancer
+with a measured spread of 0.0 and no test asserting it is a claim, not evidence.
+The material already exists.
+
+---
+
+## Bugs found and fixed (don't reintroduce)
+
+- **`settleByHeight` ran on everyone**, not just players it placed. With nobody
+  dragged, 3 of 5 players sat at the wrong spot and a stated PG who was tallest
+  got pulled to PF every render.
+- **A drop wrote the spot key into `position`.** Survivable in basketball where
+  the keys match; on football it set `position = "wr_l"` and `saveRun` snapshots
+  it, so a saved run would render the raw key forever. Dropping on the *right*
+  receiver spot also placed the player left.
+- **Football positions matched no field spot** — every WR fell through to
+  spillover and got placed by height alone, silently contradicting "stated
+  position first".
+- **The rating scripts were basketball-only**, hardcoding the six keys, the
+  weights and `sport='basketball'`. There was no way to write a football rating.
+- **The share page had drifted three ways**: wrong palette, no rating tiers, and
+  two flat lists instead of the head-to-head.
+- **`text-[3.75rem]` silently did not generate**, rendering the mobile wordmark
+  at 16px.
 
 ---
 
@@ -309,4 +575,10 @@ Not done, and deliberately so. Before deploying:
 - **Challengers aren't balanced** against the team holding the court. That's street
   rules, and it was a deliberate choice.
 - **Height lives on the person**, not the sport profile, so it carries across sports.
-- **Saved runs snapshot their teams** so old share links stay truthful as ratings change.
+- **Saved runs snapshot their teams** so old share links stay truthful as ratings
+  change.
+- **Viewing a rating is free; changing one is gated.**
+- **Red and black belong to basketball**, green to football, white-blue-red to
+  Nash itself. A sport's palette is derived from its accent, never hardcoded.
+- **The landing plane leans one way (`\`) and no white is ever drawn into it.**
+  Both were tried the other way and rejected on review, not in the abstract.
