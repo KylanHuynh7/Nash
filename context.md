@@ -560,9 +560,10 @@ npx dotenv -e .env.local -- npx tsx scripts/draft-sheet.mts basketball > draft-s
 npx dotenv -e .env.local -- node scripts/seed.mjs [--clear]
 
 # Delete one sitting's comparisons — a rushed run-through, or a demo.
-# Scoped to one session on purpose; there is no "delete all" by design,
-# because every environment shares one DATABASE_URL.
-npx dotenv -e .env.local -- npx tsx scripts/drop-session.mts 7larewtl
+# Prints what it will remove before removing it. Scoped to one session on
+# purpose; there is no "delete all" by design, because every environment
+# shares one DATABASE_URL and a delete here is a delete in production.
+npx dotenv -e .env.local -- npx tsx scripts/drop-session.mts <sessionId>
 
 # Fit Bradley-Terry to the collected comparisons and propose overalls.
 # Writes nothing — it prints, a person applies.
@@ -616,22 +617,16 @@ database: local dev writes are what everyone sees live.
 **Crowd-sourced ratings and tap-to-swap are built, committed (`4c42dfe`), and
 live in production.** `npm run build` and `eslint` are clean.
 
-#### Do this first: delete three fake rows
+#### The table is clean
 
-The `comparisons` table holds **three rows recorded under Kylan's name that are
-not his opinions** — they are clicks from browser testing on 2026-08-28. They
-must go before anyone rates, because a pair marked answered is a pair that
-rater is never asked again.
+Three browser-test rows recorded under Kylan's name were deleted on
+2026-08-28 (`drop-session.mts 7larewtl`). **`comparisons` is empty** — the
+first real answer will be the first row in it.
 
-```bash
-npx dotenv -e .env.local -- npx tsx scripts/drop-session.mts 7larewtl
-```
+If test rows ever get in again, `scripts/drop-session.mts <sessionId>` removes
+one sitting and prints what it is about to delete first.
 
-Expect three rows: Orion vs Victor, Brendan vs Taha, Joe vs Eric. After that the
-table should be empty. *(The agent could not run this — deletes against the
-database are blocked by the permission classifier.)*
-
-#### Then: send the link
+#### Send the link
 
 **https://nash-teams.vercel.app/compare/basketball** — to four or five people.
 Football is at `/compare/football` and works, but send one axis at a time.
