@@ -9,9 +9,11 @@ A pickup teams app for one friend group. Store the roster once, tap who showed
 up, get balanced teams. Built to kill the redundancy of re-describing fifteen
 people to a chatbot every time you want to pick sides.
 
-Two sports: **basketball** (complete) and **football** (page built, ratings
-pending). Everything is driven from one config per sport, so a third sport is a
-config entry, not a new app.
+Two sports: **basketball** (complete) and **football** (open, playable, on
+derived starting ratings). Everything is driven from one config per sport, so a
+third sport is a config entry, not a new app.
+
+**Live at https://nash-teams.vercel.app** — public, no login, works on cellular.
 
 ---
 
@@ -25,7 +27,7 @@ config entry, not a new app.
 | ORM | Drizzle |
 | Drag & drop | `@dnd-kit/core` |
 | Repo | `github.com/KylanHuynh7/Nash` (`origin/main`) |
-| Hosting | Vercel — project `run-it-back`, **not yet deployed** |
+| Hosting | Vercel — project `nash`, live at `nash-teams.vercel.app` |
 
 Local: `npm run dev` → http://localhost:3000. On the same Wi-Fi a phone reaches
 it at the Network address `next dev` prints (currently `192.168.12.176:3000` —
@@ -380,6 +382,55 @@ Editing the composition means changing numbers in the band lists, not polygon
 strings — the old version's hand-tuned `points` were the reason the lean was
 inconsistent in the first place.
 
+### Sport backdrop (`SportShards.tsx`)
+
+The sport page's ground is **brushed silver with the plane shattered at the
+centre** — not the old dark red radial wash, which read as a blur rather than a
+surface.
+
+Different construction from `ShardField`, because it wants a different thing.
+ShardField breaks a plane into parallel bands: orderly, one lean, a fault line.
+This is an **impact** — shards radiate from a centre and are meant to look
+chaotic.
+
+Chaos and connectedness pull against each other. Scattering independent polygons
+gives chaos and loses the connection: confetti, with silver showing through the
+gaps. So the field is a **web, not a pile** — rays at uneven angles, rings at
+uneven radii, each shard the quad between two neighbouring rays and two
+neighbouring rings. Neighbours are cut from the *same corner points*, so every
+edge is shared exactly and the mass is one shattered pane, while the jitter means
+no edge stays straight for long.
+
+Three rules that are not free to change:
+
+1. **The noise hash must be integer-only.** `Math.sin` — the usual one-line hash
+   noise — is not required by ECMAScript to be identical across implementations.
+   Node's V8 and the browser's diverge in the last bits, which is enough to move
+   a shard and produce a **hydration mismatch**. It uses `Math.imul`, and
+   geometry is rounded via `toFixed(3)` before being stringified.
+2. **A phone gets its own field.** `slice` scales to cover, so on a 390px-wide
+   phone the 160-unit field is drawn ~1350 units across and clipped to its middle
+   sliver — precisely where every ray converges. It read as a pinwheel. There are
+   separate `WIDE` and `TALL` geometries.
+3. **The mass is veiled to 0.55.** It sits directly behind the content column,
+   and at full strength its black facets and the page's dark ink cancel out —
+   labels like the spread disappear. **This is a real tradeoff**: the shards are
+   calmer than the 2K reference. The alternative, if punch is wanted back, is to
+   move the mass down-right so it sits behind the dark cards instead of under the
+   text.
+
+#### Text on the silver
+
+`--foreground` and `--muted` are tuned for dark cards and vanish on silver. Text
+that sits **directly on the ground** uses `--ink` / `--ink-soft` instead. The
+same applies to the accent: full-strength green on silver reads at about 2.6:1,
+so on-ground accent controls use `--accent-ink` (the accent mixed 72% into
+near-black). `.metal` is dark brushed steel now, and `.eyebrow` is `--ink-soft`.
+
+`body` is a plain neutral `#eceef2` and **must not carry a contrasting colour**.
+Every page paints its own ground in a fixed layer on top; when body carried
+Nash's navy, any frame where that layer was not painted flashed navy through.
+
 ### Mobile
 
 Verified at 390×844 across landing, run tab, roster, player card, court view and
@@ -436,124 +487,164 @@ byte-identical.
 
 ---
 
+## Deployment
+
+**https://nash-teams.vercel.app** — production, public, passcode-gated for edits.
+
+The Vercel project was renamed `run-it-back` → `nash`. `nash.vercel.app` is
+taken by someone else, hence the suffix. `run-it-back-amber.vercel.app` still
+resolves, so older links survive.
+
+Two things to know before touching hosting:
+
+- **`vercel alias set` pins to one build.** It does *not* follow later
+  production deploys — verified by deploying twice and watching the alias stay
+  on the old build. `nash-teams` is registered as a **project domain**
+  (`vercel domains add nash-teams.vercel.app nash`), which does follow.
+- **Vercel Authentication was on** (`ssoProtection: all_except_custom_domains`)
+  and would have bounced every friend to a Vercel login. It is off. If a future
+  project looks unreachable to outsiders, check this first.
+
+`EDIT_PASSCODE` is set in Production **as a Secret** — write-only, so
+`vercel env pull` cannot read it back. The local `.env.local` is the only
+readable copy. Without it the app **fails open** (`lib/edit-auth.ts:32`).
+
+All environments share one `DATABASE_URL`. There is no separate production
+database: local dev writes are what everyone sees live.
+
+---
+
 ## Next steps
 
 ### 0. Where the last session left off — start here
 
-**Landing design is settled and merged** (`228bc8f` on `main`). It was reviewed
-against the 2K22 cover and reworked three ways: white slivers removed, one
-consistent `\` lean, colour kept in its own territory with the clash at the
-border, then the masses ramped into a near-white ground. The full reasoning and
-the rules that replaced the old ones are under **Landing page** above — read that
-before touching `ShardField.tsx`, because two of the older findings there are
-contradicted on purpose.
+**Deployed, football opened, background rebuilt.** All of it is on `main` and
+live. Three things are worth reading before touching anything:
 
-**Football ratings are the next task and they are blocked on one thing: Q0.**
-The questionnaire (below, now recorded verbatim) was put to the user and Q0 —
-the 1-to-17 draft order — was not yet answered. Nothing else can start: the
-ladder sets the bands, and the attribute answers are shaped within the slot the
-ladder assigns. Ask for Q0 on its own, wait for it, then send the ten.
+1. **Football is positionless and QB is not a position** — see *The football
+   position model* below. This was reworked twice in one session and the
+   reasoning matters more than the code.
+2. **The sport backdrop is brushed silver now**, not the dark red wash — see
+   *Sport backdrop* under Design system.
+3. **`throwing` is flat 75 for all twelve football players.** It is the one
+   attribute with no derivation behind it, and until it is set the quarterback
+   spot picks essentially arbitrarily.
 
-Two design items were noticed during review and deliberately **not** changed,
-since neither was raised:
+**The next task is football ratings**, and it is no longer blocked. The old
+blocker (Q0, the 1-to-17 draft ladder) applied to the *basketball* method. The
+football roster is twelve, positions are real, and starting numbers exist to
+correct rather than a blank sheet.
 
-- The **wordmark underline** (`app/page.tsx`) still has a hand-set angle on its
-  red/blue split bar — the last element on the landing page with a slant that
-  isn't derived from the shard field's lean constant.
-- **Football's accent is still the placeholder `#16a34a`.** The Madden palette
-  was never picked. Worth settling before football ratings land, because the
-  whole football chrome derives from that one value.
+Still open and deliberately untouched:
 
-### 1. Football ratings — the actual next task
+- The **wordmark underline** (`app/page.tsx`) still has a hand-set angle.
+- **Football's accent is still the placeholder `#16a34a`.**
+- **Tap-to-swap** (below) — scoped, estimated, not started.
 
-The page is built; every player carries a flat 80 and everyone is `wr`.
+### 1. Football — where it stands
 
-Format is **5v5 two-hand touch**, positions **QB / TE / WR / SLOT**. There is no
-run game and no designated rusher — `rush` was removed. The slot is the closest
-thing to a back (short routes run as if he came out of the backfield), which
-makes it a role of its own rather than a third receiver.
+**Roster: twelve.** Taha, Bang, Brendan, Eric and David were removed — never
+played football with the group. Their football profiles are deleted, not left
+rated. Twelve is a clean 5v5 with two rotating.
 
-Throwing is deliberately weighted lowest (0.7) — only one player throws per
-possession, so weighting it heavily would over-rate a pocket passer who can't
-run or cover. Teams get a thrower through the **QB position spread** instead,
-and `criticalPosition: "qb"` surfaces a warning when the group can't cover it.
+| Position | Players |
+|---|---|
+| WR | Orion, Victor, Rayan, Brian, Kylan, Lucas |
+| TE | Joe, Jason, Sean, Alfonso |
+| SLOT | Danny, Justin |
 
-**The questionnaire is written and is now recorded here verbatim.** It was
-previously kept in chat only, on the reasoning that it didn't need to be a file.
-That cost a whole regeneration a session later, and a regenerated questionnaire
-is a *different* questionnaire — the wording is the instrument, so redrafting it
-silently changes what the ratings mean. It lives here now.
+**The ratings are derived, not judged.** Football shares no attributes with
+basketball, so each football skill was mapped onto the basketball skill that
+most nearly demands the same thing:
 
-Same three-pass method as basketball. Q0 is the anchor — "what round does
-he go in a 5v5 football draft" — answered for all 17 *before* anything else,
-because basketball order is not football order. Then ten behavioural questions,
-four of the six attributes getting a primary question that sets a band plus a
-second that adjusts it:
+| Football | From |
+|---|---|
+| `speed` | `athleticism`, outright — the same trait |
+| `coverage` | `defense` — staying with a man |
+| `hands` | 60% `finishing`, 40% `rebounding` — catching in traffic |
+| `routes` | 60% `playmaking`, 40% `athleticism` |
+| `iq` | 60% `playmaking`, 40% `defense` — reads and spacing |
+| `throwing` | **nothing.** Flat 75. No basketball skill implies an arm. |
 
-| | Primary | Adjuster |
-|---|---|---|
-| Throwing ·0.70 | QB rolls an ankle — how do you feel? | — |
-| Hands ·1.15 | Wide open, does it stick? | Contested catch in the endzone |
-| Speed ·1.10 | Where does he finish in a 40? | Can he actually get behind people? |
-| Routes ·1.05 | Open in three yards, or needs the play to break? | Catch-and-go on the short route |
-| Coverage ·1.10 | Who guards their best guy? | Has he taken the ball away? |
-| IQ ·0.90 | Scramble drill + does he know who he has? | — |
+`football-ratings.csv` records exactly what went in. These are a floor to
+correct from in the editor, not numbers anyone should trust. Because `throwing`
+is uniform it distorts nobody *relative* to anyone else — it just does nothing.
 
-Bands: 93–99 best here, 85–92 clearly above, 76–84 average, 69–75 below but
-functional, 65–68 floor.
+#### The football position model
 
-**Q0 — the anchor.** "It's a 5v5 two-hand touch draft. What round does he go?"
-A straight 1-to-17, no ties. Not "how good is he at football" — who you'd
-actually take, knowing four of your five have to catch and cover. Answer for all
-17 before reading anything below; the attribute questions anchor you if seen
-first.
+This changed twice, and both wrong turns are worth knowing so they aren't
+retaken.
 
-**The ten.** Answered by naming players, not by scoring them — names are more
-reliably given than numbers.
+**First wrong turn:** a first pass at the roster read as twelve receivers, and
+tight end and slot were being stripped out of the config as positions nobody
+holds. They *are* held — the list was generalising. Reverted before it shipped.
 
-1. *Throwing* — Your QB rolls an ankle. How do you feel about each of the rest
-   taking over? Who's an actual thrower, who's a "we'll survive", who can't?
-2. *Hands, primary* — He's wide open, ball hits him in the chest. Does it stick?
-   Who drops those?
-3. *Hands, adjuster* — Endzone, corner draped on him, ball's up. Who comes down
-   with it?
-4. *Speed, primary* — All 17 line up for a 40. Roughly where does each finish?
-5. *Speed, adjuster* — Can he actually get behind people in a game? Some are
-   fast in a straight line and never separate.
-6. *Routes, primary* — Does he get open within three yards of the line, or does
-   he need the play to break down first?
-7. *Routes, adjuster* — Short route, catch-and-go. Who turns five yards into
-   fifteen?
-8. *Coverage, primary* — Their best guy is lined up. Who do you put on him? And
-   who do you hide?
-9. *Coverage, adjuster* — Has he actually taken the ball away? Picks, swats,
-   breaking on the ball.
-10. *IQ* — Scramble drill: QB breaks the pocket, does he work back to him or
-    stand where the route ended? On defense, does he know who he has, or is he
-    chasing the ball?
+**Second wrong turn:** QB/WR players were modelled as a primary position plus an
+`also_plays` array, with the balancer guaranteeing each side held a QB. A column
+was added and dropped again within the hour.
 
-Positions come out of the answers, not preference: **QB** from the throwing
-question, **TE** from height + contested catch, **WR** from the speed pair,
-**SLOT** from the short-route question.
+**What it actually is:** the group doesn't designate a quarterback. A side rides
+whoever has the hot hand and switches at will. So the question was never *who is
+the QB* but *who is our best QB right now*. That makes QB a **role the team
+elects into**, not a position anyone is.
 
-The contested-catch question is answered about **hands and willingness, not
-size** — height already lives on the roster and already drives field placement,
-so scoring it there counts the same inch twice.
+So QB is a **spot**, not a position, and it is filled from an attribute:
 
-**Predictions written before the data**, so they get checked rather than
-rationalised after: hands and routes should correlate 0.85+ (both are "can he
-play receiver", asked twice, 2.20 of the 6.00 total weight); coverage, speed and
-throwing should be the independent axes; throwing will read 65 for ~13 of 17
-while eating 11.7% of the weight, which will bunch the bottom of the football
-board tighter than basketball's.
+- `SportConfig.decisiveAttribute` — the one attribute where a team's *best*
+  matters more than its average. Football names `throwing`.
+- A spot can carry `byAttribute`. Football's QB spot carries `throwing`.
+- `buildMatchups` fills attribute-claimed spots **first, and to the team's
+  best**. It has to run before position matching, or the arm is already placed
+  out wide and the spot goes to whoever was left over.
+- `cost()` in the balancer scores the decisive attribute on each team's **best**
+  rather than its average. Averaging it is wrong twice over: only one person
+  throws, so four low numbers say nothing about how a side plays; and two teams
+  can average identically while one holds the only real arm.
 
-**Still unanswered: how does the QB get pressured?** If there is a rush, pass
-rush is a real skill and none of the ten questions measures it.
+Measured over eight seeds with three throwers at 92/88/84: best-arm gap is **4
+every time** with the term, **4 or 8 without it** — 8 being both good arms
+stacked on one side.
 
-Also open: nothing captures **conditioning**. Basketball weights athleticism 1.25
-explicitly for "still going at 9-9"; football's `speed` is hinted as pure burst.
+`criticalPosition` still exists in `SportConfig` and no sport sets it. It is a
+working config option, kept because adding a sport is meant to be config only.
 
-### 2. Collect second opinions
+#### Position questionnaires — open question
+
+The user asked whether to run a questionnaire per position, and whether that is
+too much for twelve players. Two things bear on it:
+
+- **`throwing` is the one that genuinely needs asking.** Everything else has a
+  derived starting point; that column is empty. It is also now load-bearing —
+  it decides who plays quarterback and it is scored on team bests.
+- **A "QB overall" was raised** — how good someone is *as a quarterback*, as
+  distinct from their receiver overall. That is a derived figure (throwing +
+  iq, weighted), not a new stored attribute, and it would give the field view
+  something honest to show at the QB spot.
+
+### 2. Tap-to-swap (scoped, not started)
+
+Instead of dragging: tap a player, valid targets highlight, tap one to swap.
+Better than drag on a phone, which is where this gets used.
+
+**Most of it already exists.** `pinToSpot` (`TeamBoard.tsx:101`) already
+performs the exact swap — pinning a player to an occupied spot pins the
+displaced player back to the origin spot. The work is a UI layer over a reducer
+that is already written and already used by drag.
+
+| Scope | Estimate |
+|---|---|
+| Same-team spot swap | ~30–45 min |
+| Plus cross-team and bench | ~1–1.5 hr — needs a new `swap` reducer; `move` relocates one player and changes team sizes, which is not a swap |
+
+**Risk:** tap and drag share the same elements. Sensors use an 8px distance
+threshold and a 180ms touch delay (`TeamBoard.tsx:145`), so a clean tap should
+not start a drag — but this behaves differently under a real thumb than in a
+headless browser. Test on a phone before trusting it.
+
+**Football constraint:** positions are not interchangeable the way basketball's
+are, so valid targets must be position-aware there.
+
+### 2b. Collect second opinions
 
 Two-step, and **the order matters**:
 
@@ -579,20 +670,10 @@ One rule to preserve: the draft-round question was the *input* for setting
 ratings; the board is the *output*. Feeding the board back into ratings is
 circular and is how these systems drift.
 
-### 4. Deploy
+### 4. Deploy — done
 
-Not done. `vercel` CLI 59.6.2 is installed and the repo is linked to project
-`run-it-back`. Before deploying:
-
-- Set `EDIT_PASSCODE` in Vercel project env — **without it, anyone with the link
-  can change ratings**
-- Confirm the Neon integration's `DATABASE_URL` is on production
-- Decide whether the link is shared as-is or gated further
-
-**Demoing off localhost works but is fragile**: laptop must be awake with
-`npm run dev` running, phones must be on the same Wi-Fi, the router can reassign
-the LAN IP, and it serves an unoptimised dev build. The sleep timer is 1 minute —
-run `caffeinate -d` if going that route.
+See **Deployment** above. Live at https://nash-teams.vercel.app, public, with
+editing passcode-gated in production.
 
 ### 5. Tests (not started, worth doing)
 
@@ -621,6 +702,21 @@ The material already exists.
   two flat lists instead of the head-to-head.
 - **`text-[3.75rem]` silently did not generate**, rendering the mobile wordmark
   at 16px.
+- **`Math.sin` noise caused a hydration mismatch.** Server and client computed
+  marginally different shard coordinates. Fixed with `Math.imul` and rounded
+  geometry. Any generated art in a server-rendered component has this hazard.
+- **The "crash" on Generate was a navy flash**, not a crash. `body` painted
+  Nash's navy under every page while each page painted its own ground on top;
+  any frame the top layer was missing showed navy. Ruled out on the way: the
+  balancer runs in 37–69ms, `saveRun` is not passcode-gated, and neither desktop
+  nor mobile produced a single console error.
+- **A height of `5'10"` broke the ratings CSV.** The double quote is a field
+  delimiter to the RFC-4180 reader in `rate.mts`, shifting every column after
+  it. It surfaced as `missing hands` — several columns from the cause. Heights
+  go into the CSV as **plain inches**.
+- **The sit-out badge was `bg-amber-100` under `text-amber-300`** — cream on
+  light amber, a light-theme leftover. Two warning notices had the same problem.
+- **`vercel alias set` does not follow later deploys.** See Deployment.
 
 ---
 
@@ -631,6 +727,16 @@ The material already exists.
 - **The scale can't create separation.** Gaps come from ratings, not from range.
 - **Position is a preference, not a rule.** The game is positionless; the app only
   intervenes on placements anyone would object to.
+- **Football has no quarterback position.** The group rides a hot hand and
+  switches at will, so QB is a role a side elects into, not a thing anyone is.
+  It is a spot filled from `throwing` via `byAttribute`. Modelling it as a
+  position was tried — with an `also_plays` column — and rejected.
+- **A team's best matters more than its average, for one named attribute.**
+  Only one person throws; four low numbers say nothing about how a side plays.
+  `decisiveAttribute` exists for exactly this and is scored on team maxima.
+- **Derived ratings are a floor, not a judgement.** Football's numbers come from
+  basketball via a documented mapping. `throwing` has no analogue and is left
+  flat rather than invented.
 - **A drag always wins** over automatic placement, and is never blocked by
   position — experimenting with mismatches is a feature, not a mistake.
 - **Challengers aren't balanced** against the team holding the court. That's street
