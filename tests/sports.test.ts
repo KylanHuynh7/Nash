@@ -221,6 +221,23 @@ describe("sport config", () => {
     assert.equal(SPORTS.football.decisiveAttribute, "throwing");
   });
 
+  it("basketball's second axis is defense, not an offensive one", () => {
+    /*
+     * Shooting, finishing and playmaking correlate at 0.88-0.94 and carry ~48%
+     * of the weight between them — they are one thing measured three times, so
+     * a pass on any of them would largely reproduce the overall pass already
+     * collected. Defense is the independent one, and so the only second axis
+     * that can actually disagree with the overall.
+     */
+    const extra = SPORTS.basketball.axes.filter((a) => a.key !== "overall");
+    assert.deepEqual(
+      extra.map((a) => a.key),
+      ["defense"],
+      "basketball collects an axis that mostly repeats the overall",
+    );
+    assert.equal(extra[0].attribute, "defense");
+  });
+
   it("isSportId accepts only configured sports", () => {
     assert.ok(isSportId("basketball"));
     assert.ok(isSportId("football"));

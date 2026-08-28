@@ -135,6 +135,25 @@ export const SPORTS: Record<SportId, SportConfig> = {
         heading: "Who's better?",
         question: "Pick who you'd rather have on your team.",
       },
+      // Defense, and not shooting, because of what correlates with what.
+      // Shooting, finishing and playmaking sit at 0.88-0.94 with each other and
+      // carry ~48% of the weight: they are "can he play offence" measured three
+      // times, so a shooting pass would largely re-collect the overall pass
+      // already done. Defense is the most independent attribute after
+      // rebounding (0.43 average correlation), which makes it the one axis that
+      // can actually disagree with the overall.
+      //
+      // It is also the attribute most likely to be wrong. The stored ratings
+      // note Bang's floored 65 as a known soft spot, and one-way players are
+      // exactly where a single rater's read is hardest to check.
+      {
+        key: "defense",
+        label: "Defense",
+        attribute: "defense",
+        heading: "Who's the better defender?",
+        question:
+          "Pick who you'd rather have guarding the other team's best player.",
+      },
     ],
     attributes: [
       // Weighted for full-court games to 11: you run the whole floor, boards
