@@ -438,6 +438,32 @@ byte-identical.
 
 ## Next steps
 
+### 0. Where the last session left off — start here
+
+**Landing design is settled and merged** (`228bc8f` on `main`). It was reviewed
+against the 2K22 cover and reworked three ways: white slivers removed, one
+consistent `\` lean, colour kept in its own territory with the clash at the
+border, then the masses ramped into a near-white ground. The full reasoning and
+the rules that replaced the old ones are under **Landing page** above — read that
+before touching `ShardField.tsx`, because two of the older findings there are
+contradicted on purpose.
+
+**Football ratings are the next task and they are blocked on one thing: Q0.**
+The questionnaire (below, now recorded verbatim) was put to the user and Q0 —
+the 1-to-17 draft order — was not yet answered. Nothing else can start: the
+ladder sets the bands, and the attribute answers are shaped within the slot the
+ladder assigns. Ask for Q0 on its own, wait for it, then send the ten.
+
+Two design items were noticed during review and deliberately **not** changed,
+since neither was raised:
+
+- The **wordmark underline** (`app/page.tsx`) still has a hand-set angle on its
+  red/blue split bar — the last element on the landing page with a slant that
+  isn't derived from the shard field's lean constant.
+- **Football's accent is still the placeholder `#16a34a`.** The Madden palette
+  was never picked. Worth settling before football ratings land, because the
+  whole football chrome derives from that one value.
+
 ### 1. Football ratings — the actual next task
 
 The page is built; every player carries a flat 80 and everyone is `wr`.
@@ -452,8 +478,13 @@ possession, so weighting it heavily would over-rate a pocket passer who can't
 run or cover. Teams get a thrower through the **QB position spread** instead,
 and `criticalPosition: "qb"` surfaces a warning when the group can't cover it.
 
-**The questionnaire is written** (delivered in chat, deliberately not kept as a
-file). Same three-pass method as basketball. Q0 is the anchor — "what round does
+**The questionnaire is written and is now recorded here verbatim.** It was
+previously kept in chat only, on the reasoning that it didn't need to be a file.
+That cost a whole regeneration a session later, and a regenerated questionnaire
+is a *different* questionnaire — the wording is the instrument, so redrafting it
+silently changes what the ratings mean. It lives here now.
+
+Same three-pass method as basketball. Q0 is the anchor — "what round does
 he go in a 5v5 football draft" — answered for all 17 *before* anything else,
 because basketball order is not football order. Then ten behavioural questions,
 four of the six attributes getting a primary question that sets a band plus a
@@ -470,6 +501,36 @@ second that adjusts it:
 
 Bands: 93–99 best here, 85–92 clearly above, 76–84 average, 69–75 below but
 functional, 65–68 floor.
+
+**Q0 — the anchor.** "It's a 5v5 two-hand touch draft. What round does he go?"
+A straight 1-to-17, no ties. Not "how good is he at football" — who you'd
+actually take, knowing four of your five have to catch and cover. Answer for all
+17 before reading anything below; the attribute questions anchor you if seen
+first.
+
+**The ten.** Answered by naming players, not by scoring them — names are more
+reliably given than numbers.
+
+1. *Throwing* — Your QB rolls an ankle. How do you feel about each of the rest
+   taking over? Who's an actual thrower, who's a "we'll survive", who can't?
+2. *Hands, primary* — He's wide open, ball hits him in the chest. Does it stick?
+   Who drops those?
+3. *Hands, adjuster* — Endzone, corner draped on him, ball's up. Who comes down
+   with it?
+4. *Speed, primary* — All 17 line up for a 40. Roughly where does each finish?
+5. *Speed, adjuster* — Can he actually get behind people in a game? Some are
+   fast in a straight line and never separate.
+6. *Routes, primary* — Does he get open within three yards of the line, or does
+   he need the play to break down first?
+7. *Routes, adjuster* — Short route, catch-and-go. Who turns five yards into
+   fifteen?
+8. *Coverage, primary* — Their best guy is lined up. Who do you put on him? And
+   who do you hide?
+9. *Coverage, adjuster* — Has he actually taken the ball away? Picks, swats,
+   breaking on the ball.
+10. *IQ* — Scramble drill: QB breaks the pocket, does he work back to him or
+    stand where the route ended? On defense, does he know who he has, or is he
+    chasing the ball?
 
 Positions come out of the answers, not preference: **QB** from the throwing
 question, **TE** from height + contested catch, **WR** from the speed pair,
