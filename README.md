@@ -26,6 +26,12 @@ people around him even.
   spread, and parity on the sport's decisive attribute simultaneously, and
   honours "keep these two together / apart" rules. Pure math, no API call:
   ~37ms for 10 players, ~69ms for 17.
+
+  Measured against the seventeen-man roster: team averages land **within 0.2 of
+  level on every pool size and seed**, hit **exactly 0.0 whenever the arithmetic
+  allows one**, and beat a shuffled split by more than an order of magnitude —
+  random sits at 2.5–2.7 apart at the median and reaches 13.1 at worst. All
+  three are asserted in `tests/balance.test.ts` rather than claimed here.
 - **Share** — a generated matchup can be saved to a short link. Teams are stored
   as a snapshot, so an old link keeps showing the ratings the teams were built from.
 
@@ -74,7 +80,23 @@ cannot read it back; `.env.local` is the only readable copy.
 All environments share one `DATABASE_URL` — local development writes to the same
 database production reads.
 
-## Checking the balancer
+## Tests
+
+```bash
+npm test
+```
+
+95 tests over the balancer, lineup placement, the comparison picker, the sport
+configs and the Bradley-Terry fit. No test framework — Node's built-in
+`node:test`, run through `tsx` for the `@/` alias.
+
+Fixtures are the real roster pulled from the database, because a synthetic
+roster of round numbers passes everything while telling you nothing. The
+exception is `tests/bt.test.ts`, which is entirely synthetic: the fit is the one
+place an opinion becomes a number, so it has to be checked against data whose
+right answer is known — which real comparisons never are.
+
+For an eyeball check of one split instead:
 
 ```bash
 npx tsx scripts/balance-check.ts

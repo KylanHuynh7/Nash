@@ -105,6 +105,23 @@ export function buildMatchups(
       )
       .filter((s): s is Matchup => Boolean(s));
 
+    /*
+     * Spots filled from an attribute are deliberately absent from sizeOrder -
+     * nothing about a player's size decides who plays quarterback. But when one
+     * of them goes unfilled it is still somewhere to stand, and leaving it out
+     * of the spillover list drops a player off the field entirely.
+     *
+     * That is not hypothetical. A team whose players have no ratings at all -
+     * every group before anyone has rated anything, which is the state the
+     * public version starts every group in - fills no attribute spot, so a
+     * five-man side had four places to put five people and the fifth vanished.
+     */
+    for (const slot of slots) {
+      if (slot.players[teamIndex] === null && !openBySize.includes(slot)) {
+        openBySize.push(slot);
+      }
+    }
+
     leftover.forEach((player, i) => {
       const slot = openBySize[i];
       if (slot) slot.players[teamIndex] = player;

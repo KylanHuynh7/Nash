@@ -6,6 +6,7 @@
  * Flags:
  *   --lambda N   shrinkage toward the existing ratings (default 1.0)
  *   --axis KEY   which question to fit (default "overall")
+ *   --exclude NAME[,NAME]  drop these raters' rows from the fit
  *
  * It writes nothing. The fit proposes, a person applies - a model that edits
  * the roster on its own is a model nobody checks.
@@ -34,6 +35,14 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { comparisons, players, profiles } from "../db/schema";
 import { RATING_MAX, RATING_MIN, isSportId } from "../lib/sports";
+import {
+  agreementWithConsensus,
+  agreementWithCurrent,
+  dropSelfComparisons,
+  dropTies,
+  excludeRaters,
+  fitBradleyTerry,
+} from "../lib/bt";
 
 const argv = process.argv.slice(2);
 const sport = argv.find((a) => !a.startsWith("--"));
@@ -43,22 +52,30 @@ const flag = (name: string) => {
 };
 
 if (!sport || !isSportId(sport)) {
-  console.error("usage: fit-bt.mts <sport> [--lambda N] [--axis KEY]");
+  console.error(
+    "usage: fit-bt.mts <sport> [--lambda N] [--axis KEY] [--exclude NAME,...]",
+  );
   process.exit(1);
 }
 
 const axis = flag("axis") ?? "overall";
 const lambda = Number(flag("lambda") ?? 1);
-
-/**
- * Rating points per unit of latent strength.
+/*
+ * Raters to leave out of the fit.
  *
- * Sets what the model's scale means in the app's 65-99 terms. At 5, a ten-point
- * gap in overall is two latent units, i.e. the model expects the better player
- * to be preferred about 88% of the time - which is roughly how a ten-point gap
- * on this ladder actually plays.
+ * The case this exists for: whoever set the stored ratings is already in the
+ * model as the shrinkage prior, so their pairwise answers count them twice -
+ * once as the prior every strength is pulled toward, once as a voter. Excluding
+ * them at fit time is reversible and leaves the rows in the table, which
+ * matters because those rows are the only test-retest reading available: how
+ * often one person's four-second gut disagrees with their own stored ratings.
+ * Deleting them to solve the double-count would destroy that reading for good.
  */
-const POINTS_PER_UNIT = 5;
+const excluded = (flag("exclude") ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
 
 const db = getDb();
 
@@ -86,77 +103,39 @@ const rows = await db
 // are near each other, but plain Bradley-Terry has no tie term. Modelling ties
 // properly (Davidson) is worth doing once there are enough of them to estimate
 // the extra parameter; until then, dropping is the honest move.
-const ties = rows.filter((r) => r.winnerId === null).length;
-const decided = rows.filter((r) => r.winnerId !== null);
+const ties = rows.length - dropTies(rows).length;
+const decided = dropTies(rows);
 
 // A rater judging themselves is refused at write time, but the fit re-checks:
 // this is the one filter that must never silently lapse.
-const clean = decided.filter(
-  (r) => r.raterId !== r.leftId && r.raterId !== r.rightId,
+const selfFree = dropSelfComparisons(decided);
+
+const excludedIds = new Set(
+  roster.filter((p) => excluded.includes(p.name.toLowerCase())).map((p) => p.id),
 );
+for (const name of excluded) {
+  if (!roster.some((p) => p.name.toLowerCase() === name)) {
+    console.error(`warning: --exclude "${name}" matched nobody on the roster`);
+  }
+}
+const clean = excludeRaters(selfFree, excludedIds);
+const droppedByExclude = selfFree.length - clean.length;
 
 if (clean.length === 0) {
   console.error(`No comparisons yet for ${sport} / ${axis}.`);
   process.exit(1);
 }
 
-const index = new Map(roster.map((p, i) => [p.id, i]));
+const fit = fitBradleyTerry(roster, clean, { lambda });
+const { appearances, strengths: s } = fit;
 const n = roster.length;
-const meanOverall =
-  roster.reduce((sum, p) => sum + p.overall, 0) / Math.max(1, n);
-const prior = roster.map((p) => (p.overall - meanOverall) / POINTS_PER_UNIT);
 
-type Obs = { win: number; lose: number };
-const obs: Obs[] = [];
-const appearances = new Array<number>(n).fill(0);
-for (const row of clean) {
-  const w = index.get(row.winnerId!);
-  const l = index.get(row.winnerId === row.leftId ? row.rightId : row.leftId);
-  if (w === undefined || l === undefined) continue;
-  obs.push({ win: w, lose: l });
-  appearances[w]++;
-  appearances[l]++;
-}
-
-const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
-
-// Gradient ascent on the penalised log-likelihood. Seventeen parameters and a
-// concave objective - there is nothing here worth a fancier optimiser.
-const s = [...prior];
-const STEP = 0.05;
-for (let iter = 0; iter < 20000; iter++) {
-  const grad = new Array<number>(n).fill(0);
-  for (const { win, lose } of obs) {
-    const p = sigmoid(s[win] - s[lose]);
-    const g = 1 - p;
-    grad[win] += g;
-    grad[lose] -= g;
-  }
-  for (let i = 0; i < n; i++) grad[i] -= lambda * (s[i] - prior[i]);
-
-  let moved = 0;
-  for (let i = 0; i < n; i++) {
-    const delta = STEP * grad[i];
-    s[i] += delta;
-    moved = Math.max(moved, Math.abs(delta));
-  }
-  // Only differences are identified, so the scale is pinned by centring.
-  const mean = s.reduce((a, b) => a + b, 0) / n;
-  for (let i = 0; i < n; i++) s[i] -= mean;
-  if (moved < 1e-9) break;
-}
-
-const fitted = roster.map((p, i) => {
-  const raw = meanOverall + s[i] * POINTS_PER_UNIT;
-  return {
-    ...p,
-    appearances: appearances[i],
-    proposed: Math.round(
-      Math.min(RATING_MAX, Math.max(RATING_MIN, raw)),
-    ),
-    unclamped: raw,
-  };
-});
+const fitted = roster.map((p, i) => ({
+  ...p,
+  appearances: appearances[i],
+  proposed: fit.proposed[i],
+  unclamped: fit.unclamped[i],
+}));
 
 /* ------------------------------------------------------------------ *
  * Diagnostics
@@ -175,42 +154,16 @@ for (const row of clean) {
 
 const nameOf = new Map(roster.map((p) => [p.id, p.name]));
 const overallOf = new Map(roster.map((p) => [p.id, p.overall]));
-
-/** Share of comparisons where the higher current rating was the one picked. */
-function agreementWithCurrent(list: typeof clean): number {
-  let hits = 0;
-  let total = 0;
-  for (const row of list) {
-    const a = overallOf.get(row.leftId);
-    const b = overallOf.get(row.rightId);
-    if (a === undefined || b === undefined || a === b) continue;
-    const favourite = a > b ? row.leftId : row.rightId;
-    total++;
-    if (row.winnerId === favourite) hits++;
-  }
-  return total === 0 ? NaN : hits / total;
-}
-
-/** Share where the fitted consensus picked the same winner the rater did. */
-function agreementWithConsensus(list: typeof clean): number {
-  let hits = 0;
-  let total = 0;
-  for (const row of list) {
-    const a = index.get(row.leftId);
-    const b = index.get(row.rightId);
-    if (a === undefined || b === undefined) continue;
-    const favourite = s[a] > s[b] ? row.leftId : row.rightId;
-    total++;
-    if (row.winnerId === favourite) hits++;
-  }
-  return total === 0 ? NaN : hits / total;
-}
+const strengthOf = new Map(roster.map((p, i) => [p.id, s[i]]));
 
 const pct = (x: number) => (Number.isNaN(x) ? "  n/a" : `${(x * 100).toFixed(0)}%`);
 
 console.log(`\n${sport} / ${axis}`);
 console.log(
   `${clean.length} usable comparisons from ${byRater.size} rater(s)` +
+    (droppedByExclude > 0
+      ? `, ${droppedByExclude} excluded (${excluded.join(", ")})`
+      : "") +
     (ties > 0 ? `, ${ties} "too close to call" dropped` : "") +
     `, lambda ${lambda}\n`,
 );
@@ -236,14 +189,14 @@ for (const [raterId, list] of [...byRater].sort(
   const name = (nameOf.get(raterId) ?? raterId).padEnd(14);
   console.log(
     `  ${name} ${String(list.length).padStart(4)}      ${pct(
-      agreementWithCurrent(list),
-    )}         ${pct(agreementWithConsensus(list))}`,
+      agreementWithCurrent(list, overallOf),
+    )}         ${pct(agreementWithConsensus(list, strengthOf))}`,
   );
 }
 console.log(
   `  ${"ALL".padEnd(14)} ${String(clean.length).padStart(4)}      ${pct(
-    agreementWithCurrent(clean),
-  )}         ${pct(agreementWithConsensus(clean))}`,
+    agreementWithCurrent(clean, overallOf),
+  )}         ${pct(agreementWithConsensus(clean, strengthOf))}`,
 );
 console.log(
   "\n  'vs current' below 'vs consensus' means the group agrees with each other\n" +
