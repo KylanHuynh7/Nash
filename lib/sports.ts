@@ -31,6 +31,16 @@ export type SportConfig = {
    * positions evenly, but this lets the UI warn when the group is short.
    */
   criticalPosition?: string;
+  /**
+   * The attribute where a team's *best* matters more than its average.
+   *
+   * Averages are the right measure for most things: five players share the
+   * rebounding. Throwing isn't shared — one person throws, the team picks who,
+   * and they pick their best. Two teams can average identically on it and
+   * still be a mismatch if one holds the only arm. Named here, the balancer
+   * keeps the best on each side comparable.
+   */
+  decisiveAttribute?: string;
   /** Configured but not yet built out; hidden from navigation. */
   comingSoon?: boolean;
   /** What the playing surface is called — 'court', 'field'. */
@@ -50,6 +60,13 @@ export type SportConfig = {
     x: number;
     y: number;
     position?: string;
+    /**
+     * Fill this spot with whoever on the team rates highest in this attribute,
+     * rather than with whoever holds a position. A role the team elects into
+     * each possession isn't a position anyone *is*, so nobody is labelled for
+     * it — the lineup just asks who throws best and puts them there.
+     */
+    byAttribute?: string;
   }[];
   /**
    * Spots ordered by the physical presence they call for, biggest first. Used
@@ -132,7 +149,8 @@ export const SPORTS: Record<SportId, SportConfig> = {
     sideSize: 5,
     accent: "#16a34a",
     surface: "field",
-    criticalPosition: "qb",
+    // Nobody is designated. A side can ride whoever has the hot hand, and does.
+    decisiveAttribute: "throwing",
     attributes: [
       {
         key: "hands",
@@ -174,25 +192,26 @@ export const SPORTS: Record<SportId, SportConfig> = {
         weight: 0.7,
       },
     ],
-    // There is no run game and no designated rusher. The slot is the closest
-    // thing to a back — short routes run as if he came out of the backfield —
-    // which makes it a role of its own rather than a third receiver.
+    // Quarterback is deliberately absent. This group plays it as a role the
+    // team elects into and switches at will — riding a hot hand — so making it
+    // a position would designate what nobody designates, and would have the
+    // balancer solving for a scarcity that isn't real. What remains is where
+    // people line up.
     positions: [
-      { key: "qb", label: "QB", full: "Quarterback" },
       { key: "te", label: "TE", full: "Tight End" },
       { key: "wr", label: "WR", full: "Receiver" },
       { key: "slot", label: "SLOT", full: "Slot" },
     ],
-    // Four receivers and a quarterback — there's no line to draw. The two
-    // outside spots share the WR position, so each names it.
+    // Four receivers and a quarterback. The QB spot names no position: it goes
+    // to whoever on the side throws best, which is how the side would pick.
     spots: [
       { key: "wr_l", label: "WR", full: "Wide left", x: 30, y: 17, position: "wr" },
       { key: "wr_r", label: "WR", full: "Wide right", x: 70, y: 17, position: "wr" },
       { key: "te", label: "TE", full: "Tight end", x: 23, y: 53 },
       { key: "slot", label: "SLOT", full: "Slot", x: 77, y: 53 },
-      { key: "qb", label: "QB", full: "Quarterback", x: 50, y: 80 },
+      { key: "qb", label: "QB", full: "Quarterback", x: 50, y: 80, byAttribute: "throwing" },
     ],
-    sizeOrder: ["te", "wr_l", "wr_r", "slot", "qb"],
+    sizeOrder: ["te", "wr_l", "wr_r", "slot"],
   },
 };
 

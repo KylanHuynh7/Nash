@@ -1,8 +1,16 @@
+import type { SportConfig } from "@/lib/sports";
+
 export type BalancePlayer = {
   id: string;
   name: string;
   overall: number;
   position: string;
+  /**
+   * Attribute ratings. Balancing works off `overall` for strength, but a sport
+   * can name one attribute where the team's *best* matters rather than its
+   * average, and the lineup fills spots like quarterback from these.
+   */
+  ratings?: Record<string, number>;
   /** Only used to keep spillover placements sane; balancing ignores it. */
   heightInches?: number | null;
 };
@@ -17,6 +25,8 @@ export type BalanceOptions = {
   apart?: Constraint[];
   /** Changing the seed produces a different valid split. */
   seed?: number;
+  /** Supplies criticalPosition. Optional so the balancer stays usable bare. */
+  sport?: SportConfig;
 };
 
 export type BalancedTeam = {
@@ -98,6 +108,8 @@ function cost(
   positionTotals: Map<string, number>,
   playerCount: number,
   apart: Constraint[],
+  /** The attribute where a team's best matters, if the sport names one. */
+  decisive: string | null,
 ): number {
   const teamCount = assignment.length;
   const totals = assignment.map((units) =>
@@ -140,6 +152,36 @@ function cost(
     }
   }
 
+  /*
+   * The decisive attribute — throwing, in football — is scored on each team's
+   * *best*, not its average.
+   *
+   * Averaging it is wrong twice over. Only one person throws, so four low
+   * numbers say nothing about how a side will actually play; and a team can
+   * average identically while holding the only real arm on the field. What a
+   * side gets is its best thrower, because that is who it would choose, so
+   * that is what has to match across teams.
+   */
+  let decisiveGap = 0;
+  if (decisive) {
+    const bests: number[] = [];
+    for (let t = 0; t < teamCount; t++) {
+      if (counts[t] === 0) continue;
+      let best = -Infinity;
+      for (const u of assignment[t]) {
+        for (const m of u.members) {
+          const value = m.ratings?.[decisive];
+          if (typeof value === "number" && value > best) best = value;
+        }
+      }
+      if (best > -Infinity) bests.push(best);
+    }
+    if (bests.length > 1) {
+      const mean = bests.reduce((s, v) => s + v, 0) / bests.length;
+      for (const b of bests) decisiveGap += (b - mean) * (b - mean);
+    }
+  }
+
   // Keep-apart pairs that landed together.
   let violations = 0;
   const teamOf = new Map<string, number>();
@@ -152,7 +194,13 @@ function cost(
     if (ta !== undefined && ta === tb) violations++;
   }
 
-  return strength * 3 + size * 120 + shape * 1.6 + violations * 5000;
+  return (
+    strength * 3 +
+    size * 120 +
+    shape * 1.6 +
+    violations * 5000 +
+    decisiveGap * 4
+  );
 }
 
 export function balanceTeams(
@@ -182,8 +230,18 @@ export function balanceTeams(
   for (const p of players)
     positionTotals.set(p.position, (positionTotals.get(p.position) ?? 0) + 1);
 
+  const decisive = options.sport?.decisiveAttribute ?? null;
+
   const evaluate = (assignment: Unit[][]) =>
-    cost(assignment, sizes, positions, positionTotals, players.length, apart);
+    cost(
+      assignment,
+      sizes,
+      positions,
+      positionTotals,
+      players.length,
+      apart,
+      decisive,
+    );
 
   let best: Unit[][] | null = null;
   let bestCost = Infinity;

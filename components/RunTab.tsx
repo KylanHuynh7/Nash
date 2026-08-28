@@ -160,6 +160,7 @@ export default function RunTab({
 
     const next = balanceTeams(onCourt, {
       teamCount,
+      sport: config,
       seed: nextSeed,
       together: active.filter((r) => r.kind === "together"),
       apart: active.filter((r) => r.kind === "apart"),

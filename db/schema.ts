@@ -51,7 +51,24 @@ export const runs = pgTable(
     sport: text("sport").notNull(),
     label: text("label"),
     teams: jsonb("teams")
-      .$type<{ players: { id: string; name: string; overall: number; position: string }[] }[]>()
+      .$type<
+        {
+          players: {
+            id: string;
+            name: string;
+            overall: number;
+            position: string;
+            /**
+             * Carried into the snapshot because a spot can be filled from an
+             * attribute rather than a position — football's quarterback goes
+             * to the best thrower — and a share link has to lay out the same
+             * lineup months later without consulting the live roster.
+             */
+            ratings?: Record<string, number>;
+            heightInches?: number | null;
+          }[];
+        }[]
+      >()
       .notNull(),
     spread: integer("spread").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

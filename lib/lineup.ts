@@ -55,7 +55,36 @@ export function buildMatchups(
       else automatic.push(player);
     }
 
+    /*
+     * Attribute-claimed spots go first, and to the best on this team.
+     *
+     * Quarterback is the case: nobody holds it as a position, so no amount of
+     * position matching would ever fill it. It has to be resolved by asking
+     * who throws best — the same question the team would ask — and it has to
+     * happen before position matching, or the arm has already been placed out
+     * wide and the spot is filled by whoever was left.
+     */
+    const takenByAttribute = new Set<string>();
+    slots.forEach((slot, i) => {
+      const attribute = config.spots[i].byAttribute;
+      if (!attribute || slot.players[teamIndex] !== null) return;
+      let best: BalancePlayer | null = null;
+      let bestValue = -Infinity;
+      for (const player of automatic) {
+        if (takenByAttribute.has(player.id)) continue;
+        const value = player.ratings?.[attribute];
+        if (typeof value !== "number" || value <= bestValue) continue;
+        best = player;
+        bestValue = value;
+      }
+      if (best) {
+        slot.players[teamIndex] = best;
+        takenByAttribute.add(best.id);
+      }
+    });
+
     for (const player of automatic) {
+      if (takenByAttribute.has(player.id)) continue;
       const at = slots.findIndex(
         (s, i) => claimedBy[i] === player.position && s.players[teamIndex] === null,
       );
