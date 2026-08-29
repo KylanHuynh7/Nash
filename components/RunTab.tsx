@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { recordGame, saveRun } from "@/app/actions";
+import { saveRun } from "@/app/actions";
 import { Button, EmptyState, ratingTone, teamColor } from "@/components/ui";
 import TeamBoard, {
   boardSpread,
@@ -609,17 +609,9 @@ export default function RunTab({
               </div>
               <p className="mt-2 px-0.5 text-center text-[11px] text-muted">
                 Winners hold the {config.surface}. Losers go to the back of the
-                line and the longest waits come on. Tapping here only sets up
-                the next matchup — it doesn&apos;t record anything.
+                line and the longest waits come on.
               </p>
             </div>
-
-            <ResultRecorder
-              sport={config.id}
-              teams={board.teams}
-              averages={result.teams.map((t) => t.average)}
-              teamColor={teamColor}
-            />
 
             <p className="text-center text-xs text-muted">
               {view === "court"
@@ -641,146 +633,6 @@ export default function RunTab({
           </section>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * Recording a game that actually happened.
- *
- * Deliberately separate from the "who won" buttons directly above, which are a
- * preview control: people tap them to see the next matchup before walking back
- * on, so most taps of them are speculative. Mixing real results into those taps
- * would produce data that cannot be un-mixed and still looks like evidence,
- * which is the reason a `games` table was refused for so long.
- *
- * Two things keep the two apart. It is a different control in a different card
- * with different words, and **it will not submit without a final score** —
- * which is a thing you can only supply if you watched the game.
- */
-function ResultRecorder({
-  sport,
-  teams,
-  averages,
-  teamColor,
-}: {
-  sport: string;
-  teams: { id: string; name: string; overall: number; position: string }[][];
-  averages: number[];
-  teamColor: (i: number) => { label: string; dot: string; chip: string };
-}) {
-  const [scores, setScores] = useState<string[]>(["", ""]);
-  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  if (teams.length !== 2) return null;
-
-  const parsed = scores.map((s) => (s.trim() === "" ? null : Number(s)));
-  const ready =
-    parsed.every((n) => n !== null && Number.isInteger(n) && n >= 0) &&
-    parsed[0] !== parsed[1];
-
-  async function submit() {
-    if (!ready) return;
-    setState("saving");
-    setError(null);
-    const winner = (parsed[0] as number) > (parsed[1] as number) ? 0 : 1;
-    try {
-      await recordGame({
-        sport,
-        teams: teams.map((players, i) => ({
-          players: players.map((p) => ({
-            id: p.id,
-            name: p.name,
-            overall: p.overall,
-            position: p.position,
-          })),
-          average: averages[i],
-          score: parsed[i] as number,
-        })),
-        winner,
-        predictedSpread: Math.abs(averages[0] - averages[1]),
-      });
-      setState("saved");
-      setScores(["", ""]);
-    } catch (e) {
-      setState("idle");
-      setError(e instanceof Error ? e.message : "Could not record that");
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-3 shadow-[var(--shadow-card)]">
-      <div className="mb-1 px-0.5 text-sm font-medium">Record the result</div>
-      <p className="mb-3 px-0.5 text-[11px] text-muted">
-        Only for a game that actually finished. The final score is what makes it
-        worth recording — 11-2 and 11-10 say very different things.
-      </p>
-
-      <div className="grid grid-cols-2 gap-2">
-        {teams.map((team, i) => {
-          const color = teamColor(i);
-          return (
-            <label key={i} className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className={`h-2 w-2 shrink-0 rounded-full ${color.dot}`}
-              />
-              <span className="text-xs text-muted">{color.label}</span>
-              <input
-                value={scores[i]}
-                onChange={(e) => {
-                  const next = [...scores];
-                  next[i] = e.target.value.replace(/[^0-9]/g, "").slice(0, 3);
-                  setScores(next);
-                  setState("idle");
-                  setError(null);
-                }}
-                inputMode="numeric"
-                aria-label={`${color.label} final score`}
-                placeholder="—"
-                disabled={team.length === 0}
-                className="w-full min-w-0 rounded-lg border border-line bg-elevated px-2 py-1.5 text-center text-sm tabular-nums outline-none focus:border-accent disabled:opacity-40"
-              />
-            </label>
-          );
-        })}
-      </div>
-
-      {error && (
-        <p className="mt-2 px-0.5 text-[11px] text-amber-200">{error}</p>
-      )}
-
-      <Button
-        variant="ghost"
-        onClick={submit}
-        disabled={!ready || state === "saving"}
-        className="mt-3 w-full"
-      >
-        {state === "saving"
-          ? "Recording…"
-          : state === "saved"
-            ? "Recorded ✓"
-            : "Record this game"}
-      </Button>
-
-      {/*
-       * Says why the button is dead, rather than leaving it inert and
-       * unexplained - but never while it reads "Recorded", because a save
-       * clears the scores and the hint would then contradict the button.
-       */}
-      {!ready && state !== "saved" && (
-        <p className="mt-2 px-0.5 text-center text-[11px] text-muted">
-          {parsed.some((n) => n === null)
-            ? "Both scores, then it saves."
-            : "A recorded game needs a winner."}
-        </p>
-      )}
-      {state === "saved" && (
-        <p className="mt-2 px-0.5 text-center text-[11px] text-muted">
-          Put another score in to record the next one.
-        </p>
-      )}
     </div>
   );
 }

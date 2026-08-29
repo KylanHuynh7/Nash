@@ -4,7 +4,7 @@ import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
-import { comparisons, games, ticks, players, profiles, runs } from "@/db/schema";
+import { comparisons, ticks, players, profiles, runs } from "@/db/schema";
 import {
   RATING_MAX,
   RATING_MIN,
@@ -14,7 +14,6 @@ import {
   isSportId,
 } from "@/lib/sports";
 import type { BalancePlayer } from "@/lib/balance";
-import { rejectGame, type GameTeam } from "@/lib/games";
 
 export type RosterEntry = BalancePlayer & {
   ratings: Record<string, number>;
@@ -163,56 +162,6 @@ export async function saveRun(input: {
     spread: Math.round(input.spread * 10),
   });
   return { id };
-}
-
-/**
- * Record one game that was actually played.
- *
- * **Deliberately not the winner-stays-on buttons.** Those rotate the court so
- * people can see the next matchup before walking back on, and most taps of them
- * are speculative. Folding recording into them would mix real results with
- * previews irrecoverably, which is worse than collecting nothing because it
- * still looks like evidence. This is a separate action reached by a separate
- * control, and it requires a final score — you cannot enter one for a game you
- * did not watch.
- *
- * The rules live in `lib/games.ts` and are applied here rather than trusted
- * from the client, because every export in this file is a public endpoint.
- */
-export async function recordGame(input: {
-  sport: string;
-  teams: GameTeam[];
-  winner: number;
-  predictedSpread: number;
-}) {
-  if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
-
-  const reason = rejectGame({ teams: input.teams, winner: input.winner });
-  if (reason) throw new Error(reason);
-
-  const db = getDb();
-  const [row] = await db
-    .insert(games)
-    .values({
-      sport: input.sport,
-      // Stored as a snapshot, so a later re-rating cannot rewrite the evidence
-      // that is being used to judge it.
-      teams: input.teams.map((t) => ({
-        players: t.players.map((p) => ({
-          id: p.id,
-          name: p.name,
-          overall: p.overall,
-          position: p.position,
-        })),
-        average: t.average,
-        score: t.score,
-      })),
-      winner: input.winner,
-      predictedSpread: Math.round(input.predictedSpread * 10),
-    })
-    .returning({ id: games.id });
-
-  return { id: row.id };
 }
 
 export async function getRun(id: string) {
