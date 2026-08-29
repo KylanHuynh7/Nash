@@ -272,9 +272,6 @@ describe("sport config", () => {
         "block_rank",
         "steal_rank",
         "three_point_rank",
-        "stamina",
-        "strength",
-        "interior_d",
         "off_reb",
         "ball_handle",
         "nba_comp",
@@ -291,7 +288,7 @@ describe("sport config", () => {
     const comparative = collecting.filter(
       (a) => (a.mode ?? "comparative") === "comparative",
     );
-    assert.equal(comparative.length, 9);
+    assert.equal(comparative.length, 6);
     // Every comparative block states its own depth. Sharing SESSION_TARGET
     // silently reshapes finished blocks whenever the round grows.
     for (const a of comparative) {
@@ -310,10 +307,19 @@ describe("sport config", () => {
     }
     // The blocks two raters already finished keep the depth they answered
     // against, or those raters silently become incomplete.
-    const depth = Object.fromEntries(collecting.map((a) => [a.key, a.target]));
-    assert.equal(depth.stamina, 27);
-    assert.equal(depth.strength, 27);
-    assert.equal(depth.interior_d, 26);
+    /*
+     * Stamina, strength and interior D were CLOSED on 2026-08-29 once their
+     * fits were applied - `collect: false`, not deleted, so their rows keep
+     * their meaning and the axes can be reopened. Redirecting the two raters
+     * who had not started toward the six axes still on one rater is worth far
+     * more than deepening three that already had three: error falls as root n,
+     * so 1 to 3 raters removes 42% of it and 3 to 5 only 23%.
+     */
+    for (const key of ["stamina", "strength", "interior_d"]) {
+      const axis = SPORTS.basketball.axes.find((a) => a.key === key);
+      assert.ok(axis, `${key} must stay configured, not be deleted`);
+      assert.equal(axis.collect, false, `${key} should be closed`);
+    }
 
     // A pool block can never ask for more pairs than its slate holds.
     for (const a of collecting) {
