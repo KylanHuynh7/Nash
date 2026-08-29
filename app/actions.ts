@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
@@ -297,6 +297,92 @@ export async function getTickState(
  * group is large and one-directional, and it is refused here as well as
  * filtered in the UI because the action is a public endpoint.
  */
+/**
+ * Who the group was most split on, for one player.
+ *
+ * Ranked by how CLOSE the vote was, not by how near the two sit in the
+ * ratings. The point of the section this feeds is group discussion, and a comp
+ * against somebody rated one point away is only interesting if people actually
+ * disagreed about it. Jason and Eric split 2-2; that is an argument. Jason and
+ * a player he beat 4-0 is a table.
+ *
+ * `overall` only, and deliberately. Per-axis tallies do not have the density
+ * and are not going to get it — each rater answers ~27 sampled pairs out of
+ * 136, so ten raters still leaves ~2 votes per pair, under any threshold worth
+ * showing. See context.md 6l. A per-ATTRIBUTE comparison uses the fitted
+ * rating instead, which is sound on exactly this sparse data.
+ *
+ * A pair under `minVotes` is dropped rather than shown with a caveat: one
+ * person's click rendered as "the group" is the failure this app has already
+ * had twice.
+ */
+export async function getPlayerComps(
+  sport: string,
+  playerId: string,
+  minVotes = 3,
+): Promise<
+  {
+    opponentId: string;
+    votes: number;
+    wins: number;
+    losses: number;
+    ties: number;
+  }[]
+> {
+  if (!isSportId(sport)) throw new Error(`Unknown sport: ${sport}`);
+  const db = getDb();
+  const rows = await db
+    .select({
+      leftId: comparisons.leftId,
+      rightId: comparisons.rightId,
+      winnerId: comparisons.winnerId,
+    })
+    .from(comparisons)
+    .where(
+      and(
+        eq(comparisons.sport, sport),
+        eq(comparisons.axis, "overall"),
+        or(eq(comparisons.leftId, playerId), eq(comparisons.rightId, playerId)),
+      ),
+    );
+
+  const tally = new Map<
+    string,
+    { votes: number; wins: number; losses: number; ties: number }
+  >();
+  for (const row of rows) {
+    const opponentId = row.leftId === playerId ? row.rightId : row.leftId;
+    const t = tally.get(opponentId) ?? {
+      votes: 0,
+      wins: 0,
+      losses: 0,
+      ties: 0,
+    };
+    t.votes++;
+    if (row.winnerId === null) t.ties++;
+    else if (row.winnerId === playerId) t.wins++;
+    else t.losses++;
+    tally.set(opponentId, t);
+  }
+
+  return (
+    [...tally.entries()]
+      .filter(([, t]) => t.votes >= minVotes)
+      .map(([opponentId, t]) => ({ opponentId, ...t }))
+      /*
+       * Closest first. A tie counts as half a win, which is what "too close to
+       * call" means — it is kept in the data precisely because it is evidence
+       * the two are close, so it should pull a comp UP the list, not sit outside
+       * the arithmetic.
+       */
+      .sort((a, b) => {
+        const rate = (x: typeof a) => (x.wins + x.ties / 2) / x.votes;
+        const closeness = (x: typeof a) => Math.abs(0.5 - rate(x));
+        return closeness(a) - closeness(b) || b.votes - a.votes;
+      })
+  );
+}
+
 export async function submitTicks(input: {
   sport: string;
   axis: string;
@@ -371,7 +457,9 @@ export async function getCompareBootstrap(
     .map((row) => ({
       id: row.id,
       name: row.name,
-      estimate: attribute ? (row.ratings[attribute] ?? row.overall) : row.overall,
+      estimate: attribute
+        ? (row.ratings[attribute] ?? row.overall)
+        : row.overall,
     }));
 
   if (!raterId) return { pool, answered: [], seen: {} };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button, Rating, ratingBar } from "@/components/ui";
 import {
   RATING_MAX,
@@ -8,7 +8,9 @@ import {
   formatHeight,
   type SportConfig,
 } from "@/lib/sports";
-import type { RosterEntry } from "@/app/actions";
+import { getPlayerComps, type RosterEntry } from "@/app/actions";
+
+type Comp = Awaited<ReturnType<typeof getPlayerComps>>[number];
 
 /**
  * Read-only view of one player. Looking at a rating is the common case and
@@ -22,9 +24,17 @@ export default function PlayerCard({
   of,
   onClose,
   onEdit,
+  roster,
 }: {
   config: SportConfig;
   player: RosterEntry;
+  /**
+   * The whole roster, so a comparison needs no second fetch.
+   *
+   * Only the head-to-head RECORD comes from the server; the opponent's numbers
+   * are already in memory behind this modal.
+   */
+  roster: RosterEntry[];
   /** Where they sit on the board, so a number has something to mean. */
   rank: number;
   of: number;
@@ -42,6 +52,31 @@ export default function PlayerCard({
       document.body.style.overflow = "";
     };
   }, [onClose]);
+
+  /*
+   * Who the group argued about, fetched when the card opens.
+   *
+   * On open rather than precomputed with the roster: opening a card is a
+   * deliberate act, and aggregating every player's head-to-head on every
+   * roster render would be work nobody asked for.
+   */
+  const [comps, setComps] = useState<Comp[] | null>(null);
+  const [against, setAgainst] = useState<RosterEntry | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    // No synchronous reset here: SportApp keys this modal by player id, so
+    // opening a different card remounts with fresh state. Clearing it inline
+    // instead would set state during the effect and cascade a render.
+    getPlayerComps(config.id, player.id)
+      .then((rows) => live && setComps(rows))
+      // A missing comps section is a smaller failure than a card that will not
+      // open, so this degrades to nothing rather than throwing.
+      .catch(() => live && setComps([]));
+    return () => {
+      live = false;
+    };
+  }, [config.id, player.id]);
 
   const position = config.positions.find((p) => p.key === player.position);
   const height = formatHeight(player.heightInches);
@@ -129,7 +164,8 @@ export default function PlayerCard({
           <div className="text-sm">
             <p className="font-medium">Overall</p>
             <p className="text-xs text-muted">
-              Weighted mean · {RATING_MIN} is the lowest of these {of}, {RATING_MAX} the highest
+              Weighted mean · {RATING_MIN} is the lowest of these {of},{" "}
+              {RATING_MAX} the highest
             </p>
           </div>
         </div>
@@ -192,6 +228,65 @@ export default function PlayerCard({
           ))}
         </div>
 
+        {comps && comps.length > 0 && (
+          <section className="mt-5">
+            <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
+              <h3 className="eyebrow">Comps</h3>
+              <span className="text-[10px] text-muted">
+                what the group said
+              </span>
+            </div>
+            {/* Ranked by how split the vote was, not by who sits nearest in
+                the ratings. A 2-2 is an argument; a 4-0 is a table. */}
+            <p className="mb-2.5 text-xs leading-snug text-muted">
+              Closest calls from {of - 1} teammates — who the group
+              couldn&apos;t agree on.
+            </p>
+            <ul className="grid gap-2">
+              {comps.slice(0, 3).map((comp) => {
+                const other = roster.find((r) => r.id === comp.opponentId);
+                if (!other) return null;
+                const open = against?.id === other.id;
+                return (
+                  <li key={comp.opponentId}>
+                    <button
+                      type="button"
+                      onClick={() => setAgainst(open ? null : other)}
+                      aria-expanded={open}
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
+                        open
+                          ? "border-accent bg-raised"
+                          : "border-line bg-sunken hover:border-accent/50"
+                      }`}
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium">
+                        vs {other.name}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="font-mono text-xs tabular-nums text-muted">
+                          {comp.wins}&ndash;{comp.losses}
+                          {comp.ties > 0 && ` (${comp.ties} tie)`}
+                        </span>
+                        <span className="text-xs text-ink-soft">
+                          {open ? "−" : "+"}
+                        </span>
+                      </span>
+                    </button>
+                    {open && (
+                      <SideBySide
+                        left={player}
+                        right={other}
+                        families={families}
+                        comp={comp}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         <div className="mt-5 flex gap-2">
           <Button variant="ghost" onClick={onClose} className="flex-1">
             Done
@@ -201,6 +296,138 @@ export default function PlayerCard({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Two players' numbers next to each other, one family at a time.
+ *
+ * The interesting line is not who is higher — it is where the group's verdict
+ * and the stored ratings DISAGREE. Those ratings are one person's; the record
+ * is six people's, and about one pair in six comes back the other way (§0
+ * measured 82.7% agreement). A comp where they agree is a table. A comp where
+ * they diverge is the argument this section exists to start.
+ *
+ * Family averages, not the fifteen raw numbers, because a family is what the
+ * overall actually weights and fifteen rows of ±2 is noise wearing detail's
+ * costume. The per-attribute values stay one tap away on each card.
+ */
+function SideBySide({
+  left,
+  right,
+  families,
+  comp,
+}: {
+  left: RosterEntry;
+  right: RosterEntry;
+  families: {
+    name: string;
+    weight: number;
+    attributes: SportConfig["attributes"];
+  }[];
+  comp: Comp;
+}) {
+  const avg = (p: RosterEntry, attrs: SportConfig["attributes"]) =>
+    attrs.reduce((n, a) => n + (p.ratings[a.key] ?? RATING_MIN), 0) /
+    attrs.length;
+
+  // Ratings say one thing, the group said another. Ties count as half, the
+  // same way the ranking treats them.
+  const crowdFavoursLeft = comp.wins + comp.ties / 2 > comp.votes / 2;
+  const ratingFavoursLeft = left.overall > right.overall;
+  const split =
+    left.overall !== right.overall && crowdFavoursLeft !== ratingFavoursLeft;
+
+  return (
+    <div className="mt-2 rounded-xl border border-line bg-surface p-3">
+      <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-baseline gap-2 text-xs">
+        <span className="truncate font-semibold">{left.name}</span>
+        <span className="eyebrow">overall</span>
+        <span className="truncate text-right font-semibold">{right.name}</span>
+      </div>
+      <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <Rating value={left.overall} size="sm" />
+        <span className="font-mono text-[10px] tabular-nums text-muted">
+          {left.overall - right.overall > 0 ? "+" : ""}
+          {left.overall - right.overall}
+        </span>
+        <div className="flex justify-end">
+          <Rating value={right.overall} size="sm" />
+        </div>
+      </div>
+
+      <ul className="grid gap-1.5">
+        {families.map((family) => {
+          const l = avg(left, family.attributes);
+          const r = avg(right, family.attributes);
+          const lead =
+            Math.abs(l - r) < 0.5 ? "even" : l > r ? "left" : "right";
+          return (
+            <li
+              key={family.name}
+              className="grid grid-cols-[2.5rem_1fr_2.5rem] items-center gap-2 text-xs"
+            >
+              <span
+                className={`text-left font-mono tabular-nums ${lead === "left" ? "font-semibold text-foreground" : "text-muted"}`}
+              >
+                {l.toFixed(0)}
+              </span>
+              <span className="truncate text-center text-[11px] text-muted">
+                {family.name}
+              </span>
+              <span
+                className={`text-right font-mono tabular-nums ${lead === "right" ? "font-semibold text-foreground" : "text-muted"}`}
+              >
+                {r.toFixed(0)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="mt-3 border-t border-line pt-2 text-xs leading-snug text-muted">
+        {split ? (
+          <>
+            Ratings have{" "}
+            <span className="font-semibold text-foreground">
+              {ratingFavoursLeft ? left.name : right.name}
+            </span>
+            , but the group took{" "}
+            <span className="font-semibold text-accent">
+              {crowdFavoursLeft ? left.name : right.name}
+            </span>{" "}
+            {/* The winner's tally leads. `comp` counts from the focal player,
+                so printing it raw said "the group took Justin 1-2" — the
+                winner's own record shown as a loss. */}
+            {Math.max(comp.wins, comp.losses)}&ndash;
+            {Math.min(comp.wins, comp.losses)} of {comp.votes}.
+          </>
+        ) : (
+          <>
+            {comp.votes} teammates weighed in
+            {comp.wins === comp.losses ? (
+              <>
+                {" "}
+                and split{" "}
+                <span className="font-semibold text-foreground">
+                  {comp.wins}&ndash;{comp.losses}
+                </span>
+                .
+              </>
+            ) : (
+              <>
+                , taking{" "}
+                <span className="font-semibold text-foreground">
+                  {comp.wins > comp.losses ? left.name : right.name}
+                </span>{" "}
+                {Math.max(comp.wins, comp.losses)}&ndash;
+                {Math.min(comp.wins, comp.losses)}.
+              </>
+            )}
+          </>
+        )}
+      </p>
     </div>
   );
 }

@@ -152,7 +152,9 @@ export default function SportApp({
         ))}
       </div>
 
-      {tab === "roster" && roster.length > 0 && <CompareInvite config={config} />}
+      {tab === "roster" && roster.length > 0 && (
+        <CompareInvite config={config} />
+      )}
 
       {tab === "run" ? (
         <RunTab
@@ -166,12 +168,16 @@ export default function SportApp({
 
       {viewing && (
         <PlayerCard
+          // Keyed so opening a different player remounts with fresh comps
+          // state instead of briefly showing the previous player's.
+          key={viewing.id}
           config={config}
           player={viewing}
           rank={roster.findIndex((p) => p.id === viewing.id) + 1}
           of={roster.length}
           onClose={() => setViewing(null)}
           onEdit={() => requestEdit({ mode: "edit", player: viewing })}
+          roster={roster}
         />
       )}
 
