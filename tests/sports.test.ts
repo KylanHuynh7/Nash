@@ -35,10 +35,12 @@ describe("computeOverall", () => {
 
   it("is a weighted mean, not a flat one", () => {
     const config = SPORTS.basketball;
-    // Athleticism is weighted 1.25, playmaking 1.00. Moving the heavier one
-    // has to move the overall further.
+    // Finishing is weighted 1.15, playmaking 1.00. Moving the heavier one has
+    // to move the overall further. (Deliberately not a physical: after the
+    // split those carry 1.25/3 each, which is *lighter* than playmaking —
+    // the family keeps the parent's weight, the members do not.)
     const base = Object.fromEntries(config.attributes.map((a) => [a.key, 80]));
-    const heavier = { ...base, athleticism: 90 };
+    const heavier = { ...base, finishing: 90 };
     const lighter = { ...base, playmaking: 90 };
     assert.ok(
       computeOverall(config, heavier) >= computeOverall(config, lighter),
@@ -233,21 +235,27 @@ describe("sport config", () => {
     );
   });
 
-  it("basketball's second axis is defense, not an offensive one", () => {
+  it("basketball collects the three split attributes, not offensive ones", () => {
     /*
-     * Shooting, finishing and playmaking correlate at 0.88-0.94 and carry ~48%
-     * of the weight between them — they are one thing measured three times, so
+     * Shooting, finishing and playmaking correlate at 0.88-0.94 and carry
+     * about half the weight between them — one thing measured three times — so
      * a pass on any of them would largely reproduce the overall pass already
-     * collected. Defense is the independent one, and so the only second axis
-     * that can actually disagree with the overall.
+     * collected. The round collects the attributes that were split instead,
+     * which are the ones holding no data of their own yet.
      */
-    const extra = SPORTS.basketball.axes.filter((a) => a.key !== "overall");
+    const collecting = SPORTS.basketball.axes.filter((a) => a.collect);
     assert.deepEqual(
-      extra.map((a) => a.key),
-      ["defense"],
-      "basketball collects an axis that mostly repeats the overall",
+      collecting.map((a) => a.key),
+      ["stamina", "strength", "interior_d"],
     );
-    assert.equal(extra[0].attribute, "defense");
+    for (const axis of collecting) {
+      assert.ok(axis.attribute, `${axis.key} collects toward no attribute`);
+    }
+    // The settled overall pass must never be reopened by the unified link.
+    assert.ok(
+      !SPORTS.basketball.axes.find((a) => a.key === "overall")?.collect,
+      "the overall pass is settled and must not be re-collected",
+    );
   });
 
   it("isSportId accepts only configured sports", () => {

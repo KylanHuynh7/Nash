@@ -206,6 +206,33 @@ export type CompareBootstrap = {
   seen: Record<string, number>;
 };
 
+/**
+ * One axis's slice of a unified round: the pool as that axis sees it, plus what
+ * this rater has already answered on it.
+ */
+export type AxisBootstrap = CompareBootstrap & { axis: string };
+
+/**
+ * Everything a multi-axis session needs, in one round trip.
+ *
+ * Fetched together rather than per block, because a rater who finishes the
+ * stamina questions should move straight into strength — a loading pause
+ * between blocks is the moment a three-minute session becomes a five-minute
+ * one and somebody puts their phone down.
+ */
+export async function getRoundBootstrap(
+  sport: SportId,
+  raterId: string,
+  axes: string[],
+): Promise<AxisBootstrap[]> {
+  return Promise.all(
+    axes.map(async (axis) => ({
+      axis,
+      ...(await getCompareBootstrap(sport, raterId, axis)),
+    })),
+  );
+}
+
 export async function getCompareBootstrap(
   sport: SportId,
   raterId: string | null,

@@ -4,6 +4,7 @@ import {
   SESSION_TARGET,
   anchorPairs,
   availablePairs,
+  blockTargets,
   nextPair,
   pairKey,
   seedFor,
@@ -216,5 +217,46 @@ describe("availablePairs", () => {
     assert.ok(availablePairs(0, true) === 0);
     assert.ok(availablePairs(1, true) === 0);
     assert.ok(availablePairs(2, true) === 0);
+  });
+});
+
+describe("round budget", () => {
+  it("is capped at 80 and nobody may exceed it", () => {
+    // A fixed ceiling, not a suggestion. The old flow offered +20 at a time and
+    // two of five raters took it; a multi-axis round divides one budget between
+    // its axes, so an open target would let an eager rater pile answers onto
+    // whichever block they were in and skew the comparison the split exists to
+    // make.
+    assert.equal(SESSION_TARGET, 80);
+    for (const axes of [1, 2, 3, 4, 5]) {
+      const total = blockTargets(axes, pool.length).reduce((a, b) => a + b, 0);
+      assert.ok(total <= SESSION_TARGET, `${axes} axes summed to ${total}`);
+    }
+  });
+
+  it("spends the whole budget when the pool allows", () => {
+    // 80 across three axes is 27/27/26, not 26/26/26 and four questions short.
+    assert.deepEqual(blockTargets(3, pool.length), [27, 27, 26]);
+    assert.deepEqual(blockTargets(1, pool.length), [80]);
+    assert.deepEqual(blockTargets(2, pool.length), [40, 40]);
+    assert.equal(
+      blockTargets(3, pool.length).reduce((a, b) => a + b, 0),
+      SESSION_TARGET,
+    );
+  });
+
+  it("never promises more questions than a rater has pairs", () => {
+    // The same trap the single-axis target had: a rater cannot answer more
+    // pairs than exist, and a bar counting toward one would never fill.
+    const tiny = 6; // 5 others -> 10 pairs
+    const targets = blockTargets(3, tiny);
+    assert.ok(
+      targets.every((t) => t <= availablePairs(tiny, true)),
+      `promised ${targets} of ${availablePairs(tiny, true)} available`,
+    );
+  });
+
+  it("gives an empty round no blocks", () => {
+    assert.deepEqual(blockTargets(0, pool.length), []);
   });
 });

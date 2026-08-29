@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCompareBootstrap } from "@/app/actions";
+import { getRoundBootstrap } from "@/app/actions";
 import CompareApp from "@/components/CompareApp";
 import CompareLinkGate from "@/components/CompareLinkGate";
 import { resolveRater } from "@/lib/rater";
@@ -26,13 +26,22 @@ export default async function ComparePage(
   const chrome = sportChrome(config) as React.CSSProperties;
   const { rater: token, axis: axisParam } = await props.searchParams;
 
-  // Which question this link asks. Unknown axes 404 rather than quietly
-  // collecting under a key nothing will ever fit, and the default is always the
-  // sport's first axis — the overall, which is the number the balancer uses.
-  const axis = axisParam
-    ? config.axes.find((a) => a.key === axisParam)
-    : config.axes[0];
-  if (!axis) notFound();
+  /*
+   * Which questions this link asks.
+   *
+   * With no `axis`, the link runs the whole current round — every axis flagged
+   * `collect` — because friends get **one** link, not one per attribute. That
+   * is the difference between a round that gets finished and three links where
+   * the third never gets opened.
+   *
+   * `?axis=` still pins a single axis, which is what makes a re-send of one
+   * block possible. An unknown axis 404s rather than quietly collecting under a
+   * key nothing will ever fit.
+   */
+  const round = axisParam
+    ? config.axes.filter((a) => a.key === axisParam)
+    : config.axes.filter((a) => a.collect);
+  if (round.length === 0) notFound();
 
   // No token at all is the ordinary case for someone reopening the page from
   // their history, so the gate checks for a remembered link before refusing.
@@ -57,9 +66,13 @@ export default async function ComparePage(
   // pairs come down with the page. This used to be a second round trip: the
   // name lived in localStorage, so the server had to render unfiltered and the
   // client refetched once it could read who was asking.
-  let bootstrap;
+  let round_data;
   try {
-    bootstrap = await getCompareBootstrap(sport, rater.id, axis.key);
+    round_data = await getRoundBootstrap(
+      sport,
+      rater.id,
+      round.map((a) => a.key),
+    );
   } catch {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-5 py-16">
@@ -73,14 +86,14 @@ export default async function ComparePage(
     );
   }
 
-  if (bootstrap.pool.length < 3) notFound();
+  if (round_data[0].pool.length < 3) notFound();
 
   return (
     <div className="flex flex-1 flex-col" style={chrome}>
       <CompareApp
         config={config}
-        axis={axis}
-        bootstrap={bootstrap}
+        axes={round}
+        round={round_data}
         rater={rater}
         token={String(token)}
       />

@@ -1,0 +1,206 @@
+[
+  {
+    "id": "4676cc38-4328-40a8-90c4-c583f644a0f5",
+    "ratings": {
+      "defense": 81,
+      "shooting": 71,
+      "finishing": 79,
+      "playmaking": 81,
+      "rebounding": 89,
+      "athleticism": 83
+    },
+    "overall": 81
+  },
+  {
+    "id": "98df2d49-5cd5-4c1e-b5b2-52a41164859e",
+    "ratings": {
+      "defense": 65,
+      "shooting": 92,
+      "finishing": 93,
+      "playmaking": 87,
+      "rebounding": 65,
+      "athleticism": 75
+    },
+    "overall": 79
+  },
+  {
+    "id": "ff7c3b60-5780-4ce8-a786-cee0636b6d79",
+    "ratings": {
+      "defense": 72,
+      "shooting": 78,
+      "finishing": 76,
+      "playmaking": 74,
+      "rebounding": 72,
+      "athleticism": 83
+    },
+    "overall": 76
+  },
+  {
+    "id": "983981bc-d78f-4c48-a78c-b2269552b139",
+    "ratings": {
+      "defense": 72,
+      "shooting": 69,
+      "finishing": 70,
+      "playmaking": 67,
+      "rebounding": 78,
+      "athleticism": 86
+    },
+    "overall": 74
+  },
+  {
+    "id": "8ce6d010-2aea-4732-b029-741ff63a7a64",
+    "ratings": {
+      "defense": 70,
+      "shooting": 76,
+      "finishing": 68,
+      "playmaking": 66,
+      "rebounding": 65,
+      "athleticism": 78
+    },
+    "overall": 71
+  },
+  {
+    "id": "b6986e2c-f8c7-4907-922f-4cc2c718f7e8",
+    "ratings": {
+      "defense": 66,
+      "shooting": 72,
+      "finishing": 70,
+      "playmaking": 67,
+      "rebounding": 65,
+      "athleticism": 80
+    },
+    "overall": 70
+  },
+  {
+    "id": "6b767736-bc3c-4363-8f13-84ca23e3f7ad",
+    "ratings": {
+      "defense": 67,
+      "shooting": 68,
+      "finishing": 66,
+      "playmaking": 65,
+      "rebounding": 67,
+      "athleticism": 68
+    },
+    "overall": 67
+  },
+  {
+    "id": "12eae4f1-a6ee-43b5-8a96-803ebaa9d493",
+    "ratings": {
+      "defense": 65,
+      "shooting": 65,
+      "finishing": 65,
+      "playmaking": 65,
+      "rebounding": 65,
+      "athleticism": 66
+    },
+    "overall": 65
+  },
+  {
+    "id": "d6f3b9cc-7773-4c30-bc52-ab3660940afd",
+    "ratings": {
+      "defense": 66,
+      "shooting": 68,
+      "finishing": 67,
+      "playmaking": 65,
+      "rebounding": 65,
+      "athleticism": 65
+    },
+    "overall": 66
+  },
+  {
+    "id": "f2b284d4-1f03-45a7-9e14-880bd36d2987",
+    "ratings": {
+      "defense": 97,
+      "shooting": 95,
+      "finishing": 96,
+      "playmaking": 99,
+      "rebounding": 88,
+      "athleticism": 99
+    },
+    "overall": 96
+  },
+  {
+    "id": "ca5e50db-4222-4958-b7be-91f660482f86",
+    "ratings": {
+      "defense": 95,
+      "shooting": 93,
+      "finishing": 93,
+      "playmaking": 90,
+      "rebounding": 78,
+      "athleticism": 96
+    },
+    "overall": 91
+  },
+  {
+    "id": "9605588e-007d-41dd-a191-21d04429fd22",
+    "ratings": {
+      "defense": 88,
+      "shooting": 93,
+      "finishing": 94,
+      "playmaking": 85,
+      "rebounding": 82,
+      "athleticism": 96
+    },
+    "overall": 90
+  },
+  {
+    "id": "85b5fda7-ee7f-4bd5-845e-3182cd47a73f",
+    "ratings": {
+      "defense": 87,
+      "shooting": 87,
+      "finishing": 84,
+      "playmaking": 88,
+      "rebounding": 79,
+      "athleticism": 84
+    },
+    "overall": 85
+  },
+  {
+    "id": "1081a67b-2de8-4802-8d72-679356bcc226",
+    "ratings": {
+      "defense": 72,
+      "shooting": 88,
+      "finishing": 90,
+      "playmaking": 86,
+      "rebounding": 66,
+      "athleticism": 90
+    },
+    "overall": 82
+  },
+  {
+    "id": "df4486e5-edba-4733-bc80-d82a78e3c70b",
+    "ratings": {
+      "defense": 94,
+      "shooting": 82,
+      "finishing": 78,
+      "playmaking": 80,
+      "rebounding": 70,
+      "athleticism": 80
+    },
+    "overall": 81
+  },
+  {
+    "id": "9a2ce497-f22b-407c-ba0f-e4fdebf03e54",
+    "ratings": {
+      "defense": 82,
+      "shooting": 85,
+      "finishing": 80,
+      "playmaking": 80,
+      "rebounding": 91,
+      "athleticism": 70
+    },
+    "overall": 81
+  },
+  {
+    "id": "c181ff26-9968-4146-a6d4-8681496a0d85",
+    "ratings": {
+      "defense": 92,
+      "shooting": 90,
+      "finishing": 88,
+      "playmaking": 82,
+      "rebounding": 82,
+      "athleticism": 76
+    },
+    "overall": 85
+  }
+]

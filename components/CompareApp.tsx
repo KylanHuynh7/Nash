@@ -3,14 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { submitComparison } from "@/app/actions";
-import type { CompareBootstrap } from "@/app/actions";
-import { Button } from "@/components/ui";
+import type { AxisBootstrap } from "@/app/actions";
 import { rememberToken } from "@/components/CompareLinkGate";
 import SportShards from "@/components/SportShards";
 import {
-  SESSION_TARGET,
   anchorPairs,
-  availablePairs,
+  blockTargets,
   nextPair,
   pairKey,
   seedFor,
@@ -21,87 +19,120 @@ import type { Rater } from "@/lib/rater";
 import type { CompareAxis, SportConfig } from "@/lib/sports";
 
 /**
- * The collector.
+ * The collector — one link, one round, several axes.
  *
- * The rater arrives as a prop because identity now comes from the link's token
- * and is resolved on the server. That deleted a fair amount of machinery: this
- * used to read a name out of localStorage through `useSyncExternalStore`, gate
- * the first render on being mounted so the picker did not flash at a returning
- * rater, and then refetch the bootstrap once it knew who was asking. All of it
- * existed because the server could not know the rater. Now it can.
+ * The rater arrives as a prop because identity comes from the link's token and
+ * is resolved on the server. That deleted a fair amount of machinery: this used
+ * to read a name out of localStorage through `useSyncExternalStore`, gate the
+ * first render on being mounted so the picker did not flash at a returning
+ * rater, and refetch the bootstrap once it knew who was asking.
+ *
+ * A round walks its axes in **sequential blocks**, never interleaved. Thirty
+ * stamina questions, then thirty strength, then interior defense. Alternating
+ * "who is stronger" with "who protects the rim" every four seconds is expensive
+ * to think about, and the cost would come out of answer quality — a rater
+ * should build a frame and stay inside it.
  */
 export default function CompareApp({
   config,
-  axis,
-  bootstrap,
+  axes,
+  round,
   rater,
   token,
 }: {
   config: SportConfig;
-  axis: CompareAxis;
-  bootstrap: CompareBootstrap;
+  axes: CompareAxis[];
+  round: AxisBootstrap[];
   rater: Rater;
   token: string;
 }) {
-  // Seeded from the server render, so a returning rater's answered pairs are
-  // known before the first question is drawn rather than one round trip later.
-  const [answered, setAnswered] = useState<Set<string>>(
-    () => new Set(bootstrap.answered),
+  // Per-axis answered sets, seeded from the server render so a returning rater
+  // resumes mid-round rather than starting the block again.
+  const [answered, setAnswered] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(round.map((r) => [r.axis, new Set(r.answered)])),
   );
-  const [seen, setSeen] = useState<Record<string, number>>(bootstrap.seen);
-  /** Raised by "keep going", so finishing the set is an offer and not a wall. */
-  const [bonus, setBonus] = useState(0);
+  const [seen, setSeen] = useState<Record<string, Record<string, number>>>(() =>
+    Object.fromEntries(round.map((r) => [r.axis, r.seen])),
+  );
 
   // One id per sitting, so a rushed run-through can be identified and dropped
   // without discarding that person's earlier, more considered answers. Created
   // on the first answer, which is the first moment it can matter.
   const sessionRef = useRef<string | null>(null);
 
-  const pool: ComparePlayer[] = bootstrap.pool;
+  const pool: ComparePlayer[] = round[0].pool;
+  const targets = useMemo(
+    () => blockTargets(axes.length, pool.length),
+    [axes.length, pool.length],
+  );
 
-  // So the bare /compare/[sport] URL still works for someone who bookmarked it
-  // or reopened it from history. Only ever a token that arrived in a link.
   useEffect(() => {
     rememberToken(token);
   }, [token]);
 
   const anchors = useMemo(() => anchorPairs(pool), [pool]);
-  // Progress counts every answer this rater has ever given, not this sitting's.
-  // Someone who answered thirty last week and reopens the page has done half
-  // the work, and being shown "0 of 60" tells them they have done none of it.
-  const total = answered.size;
-  // Never promise more questions than exist. A twelve-man roster leaves a rater
-  // 55 pairs, and a bar counting toward 60 would never fill.
-  const target = Math.min(
-    SESSION_TARGET + bonus,
-    availablePairs(pool.length, true),
+
+  /*
+   * Which block is live, and how far through the round we are.
+   *
+   * A block is finished when its own target is met. Progress is reported for
+   * the *round*, not the block: someone should see "62 of 80" once, not
+   * "2 of 27" three separate times, because the round is what they agreed to.
+   */
+  const counts = axes.map((a) => answered[a.key]?.size ?? 0);
+  const total = counts.reduce((sum, n) => sum + n, 0);
+  const target = targets.reduce((sum, n) => sum + n, 0);
+  const blockIndex = axes.findIndex((a, i) => counts[i] < targets[i]);
+  const axis = blockIndex === -1 ? null : axes[blockIndex];
+
+  // Per-axis pools: the estimate steering pair choice is that axis's own
+  // number, so a stamina block asks about stamina neighbours.
+  const axisPool = axis
+    ? (round.find((r) => r.axis === axis.key)?.pool ?? pool)
+    : pool;
+
+  const seed = useMemo(
+    () => seedFor(rater.id, total),
+    [rater.id, total],
   );
 
-  const seed = useMemo(() => seedFor(rater.id, total), [rater.id, total]);
-
-  const pair: Pair | null = useMemo(
-    () => nextPair({ pool, raterId: rater.id, answered, seen, seed, anchors }),
-    [pool, rater.id, answered, seen, seed, anchors],
-  );
+  const pair: Pair | null = useMemo(() => {
+    if (!axis) return null;
+    return nextPair({
+      pool: axisPool,
+      raterId: rater.id,
+      answered: answered[axis.key] ?? new Set(),
+      seen: seen[axis.key] ?? {},
+      seed,
+      anchors,
+    });
+  }, [axis, axisPool, rater.id, answered, seen, seed, anchors]);
 
   function answer(winnerId: string | null) {
-    if (!pair) return;
+    if (!pair || !axis) return;
     sessionRef.current ??= Math.random().toString(36).slice(2, 10);
 
     const key = pairKey(pair.left.id, pair.right.id);
+    const axisKey = axis.key;
 
     // Recorded locally first and awaited nowhere: at four seconds a question,
     // a network round trip between two names is the whole interaction.
-    setAnswered((prev) => new Set(prev).add(key));
+    setAnswered((prev) => ({
+      ...prev,
+      [axisKey]: new Set(prev[axisKey]).add(key),
+    }));
     setSeen((prev) => ({
       ...prev,
-      [pair.left.id]: (prev[pair.left.id] ?? 0) + 1,
-      [pair.right.id]: (prev[pair.right.id] ?? 0) + 1,
+      [axisKey]: {
+        ...prev[axisKey],
+        [pair.left.id]: (prev[axisKey]?.[pair.left.id] ?? 0) + 1,
+        [pair.right.id]: (prev[axisKey]?.[pair.right.id] ?? 0) + 1,
+      },
     }));
 
     void submitComparison({
       sport: config.id,
-      axis: axis.key,
+      axis: axisKey,
       raterId: rater.id,
       sessionId: sessionRef.current,
       leftId: pair.left.id,
@@ -114,7 +145,7 @@ export default function CompareApp({
     });
   }
 
-  const done = total >= target;
+  const done = axis === null || pair === null;
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6 lg:max-w-xl lg:px-8 lg:pt-10">
@@ -127,22 +158,27 @@ export default function CompareApp({
         >
           ← {config.label}
         </Link>
-        <h1 className="metal mt-3 text-2xl leading-none">{axis.heading}</h1>
+        <h1 className="metal mt-3 text-2xl leading-none">
+          {axis ? axis.heading : "That's the round."}
+        </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          {axis.question} Go with your gut — there&apos;s no wrong answer, and
-          nobody sees your picks individually.
+          {axis
+            ? `${axis.question} Go with your gut — there's no wrong answer, and nobody sees your picks individually.`
+            : "Thanks — that's everything we needed."}
         </p>
       </header>
 
-      {done ? (
-        <Finished
-          count={total}
-          config={config}
-          onMore={() => setBonus((b) => b + 20)}
-        />
-      ) : pair ? (
+      {done || !axis ? (
+        <Finished count={total} config={config} />
+      ) : (
         <>
-          <Progress count={total} target={target} />
+          <Progress
+            count={total}
+            target={target}
+            block={blockIndex + 1}
+            blocks={axes.length}
+            label={axis.label}
+          />
           <div className="mt-6 grid gap-3">
             <Choice player={pair.left} onPick={() => answer(pair.left.id)} />
             <div className="flex items-center gap-3">
@@ -164,8 +200,6 @@ export default function CompareApp({
             You&apos;ll never be asked about yourself.
           </p>
         </>
-      ) : (
-        <Finished count={total} config={config} onMore={null} />
       )}
     </main>
   );
@@ -195,7 +229,19 @@ function Choice({
   );
 }
 
-function Progress({ count, target }: { count: number; target: number }) {
+function Progress({
+  count,
+  target,
+  block,
+  blocks,
+  label,
+}: {
+  count: number;
+  target: number;
+  block: number;
+  blocks: number;
+  label: string;
+}) {
   const pct = Math.min(100, (count / target) * 100);
   return (
     <div>
@@ -203,9 +249,7 @@ function Progress({ count, target }: { count: number; target: number }) {
         <span className="eyebrow">
           {count} of {target}
         </span>
-        <span className="text-xs text-ink-soft">
-          {remaining(count, target)}
-        </span>
+        <span className="text-xs text-ink-soft">{remaining(count, target)}</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
         <div
@@ -213,6 +257,13 @@ function Progress({ count, target }: { count: number; target: number }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      {/* Which question is being asked now. A rater who does not notice the
+          question changed answers the next block as if it were the last one. */}
+      {blocks > 1 && (
+        <p className="mt-2 text-xs text-ink-soft">
+          Part {block} of {blocks} — <span className="font-semibold text-ink">{label}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -225,33 +276,31 @@ function remaining(count: number, target: number): string {
   return minutes <= 1 ? "under a minute left" : `about ${minutes} min left`;
 }
 
-function Finished({
-  count,
-  config,
-  onMore,
-}: {
-  count: number;
-  config: SportConfig;
-  onMore: (() => void) | null;
-}) {
+/**
+ * The end of the round, and it is an end.
+ *
+ * There is deliberately no "keep going". The old single-axis flow offered +20
+ * and two of five raters took it, which was a good sign — but a round divides
+ * one fixed budget between its axes, and letting an eager rater pile extra
+ * answers onto whichever block they happened to be in would skew the very
+ * comparison the split exists to make. Every rater contributes the same shape.
+ */
+function Finished({ count, config }: { count: number; config: SportConfig }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
       <p className="text-lg font-semibold text-foreground">
-        {onMore ? "That's the set — thank you." : "You've answered every pair."}
+        That&apos;s the set — thank you.
       </p>
       <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-muted">
         {count} answers in. They get pooled with everyone else&apos;s, so no
         single person&apos;s opinion decides a rating.
       </p>
-      <div className="mt-5 flex flex-col gap-2.5">
-        {onMore && <Button onClick={onMore}>Keep going</Button>}
-        <Link
-          href={`/${config.id}`}
-          className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-foreground transition hover:border-line-strong hover:bg-sunken"
-        >
-          Back to {config.label}
-        </Link>
-      </div>
+      <Link
+        href={`/${config.id}`}
+        className="mt-5 inline-block rounded-xl border border-line bg-surface px-4 py-3 text-sm text-foreground transition hover:border-line-strong hover:bg-sunken"
+      >
+        Back to {config.label}
+      </Link>
     </div>
   );
 }

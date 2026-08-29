@@ -235,7 +235,39 @@ function hashKey(key: string, raterId: string | null): number {
  * seconds each) and more of them tighten every individual estimate, so there is
  * no reason to leave them uncollected.
  */
-export const SESSION_TARGET = 60;
+/**
+ * The whole round, across every axis in it. A hard ceiling, not a suggestion.
+ *
+ * It was 60 for a single-axis round, with a "keep going" button adding 20 at a
+ * time — two of the first five raters used it. The cap is now fixed at 80 and
+ * nobody may exceed it. The reason is that a multi-axis round divides one
+ * budget between its axes, so an open-ended target would let an eager rater
+ * pile answers onto whichever axis came last and quietly unbalance the very
+ * thing the split is meant to measure. A fixed ceiling keeps every rater's
+ * contribution the same shape.
+ */
+export const SESSION_TARGET = 80;
+
+/**
+ * How the round's budget divides between its axes.
+ *
+ * Evenly, with the remainder going to the earliest blocks, so three axes out of
+ * 80 give 27/27/26 rather than 26/26/26 and four short. Each block is capped by
+ * what is actually available too — a rater cannot answer more pairs than exist.
+ */
+export function blockTargets(
+  axisCount: number,
+  poolSize: number,
+  total: number = SESSION_TARGET,
+): number[] {
+  if (axisCount <= 0) return [];
+  const ceiling = availablePairs(poolSize, true);
+  const base = Math.floor(total / axisCount);
+  const extra = total % axisCount;
+  return Array.from({ length: axisCount }, (_, i) =>
+    Math.min(ceiling, base + (i < extra ? 1 : 0)),
+  );
+}
 
 /**
  * How many questions this rater could answer at most.

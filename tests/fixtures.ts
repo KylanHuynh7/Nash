@@ -16,24 +16,31 @@ type Row = {
   overall: number;
 };
 
+/*
+ * Split 2026-08-29: athleticism -> speed/strength/stamina, defense ->
+ * perimeter_d/interior_d. Each child was seeded at its parent's value, so the
+ * three physicals and the two defensive numbers still agree here. They will
+ * separate as the collected axes land, and these fixtures should be
+ * regenerated from the database when they do rather than hand-edited.
+ */
 const BASKETBALL: Row[] = [
-  { name: "Taha", h: 74, position: "pg", overall: 96, ratings: { defense: 97, shooting: 95, finishing: 96, playmaking: 99, rebounding: 88, athleticism: 99 } },
-  { name: "Brendan", h: 70, position: "sg", overall: 91, ratings: { defense: 95, shooting: 93, finishing: 93, playmaking: 90, rebounding: 78, athleticism: 96 } },
-  { name: "Orion", h: 70, position: "sf", overall: 90, ratings: { defense: 88, shooting: 93, finishing: 94, playmaking: 85, rebounding: 82, athleticism: 96 } },
-  { name: "Joe", h: 72, position: "sf", overall: 85, ratings: { defense: 92, shooting: 90, finishing: 88, playmaking: 82, rebounding: 82, athleticism: 76 } },
-  { name: "Victor", h: 71, position: "pg", overall: 85, ratings: { defense: 87, shooting: 87, finishing: 84, playmaking: 88, rebounding: 79, athleticism: 84 } },
-  { name: "Eric", h: 65, position: "pg", overall: 82, ratings: { defense: 72, shooting: 88, finishing: 90, playmaking: 86, rebounding: 66, athleticism: 90 } },
-  { name: "Kylan", h: 70, position: "pf", overall: 81, ratings: { defense: 81, shooting: 71, finishing: 79, playmaking: 81, rebounding: 89, athleticism: 83 } },
-  { name: "David", h: 66, position: "sg", overall: 81, ratings: { defense: 94, shooting: 82, finishing: 78, playmaking: 80, rebounding: 70, athleticism: 80 } },
-  { name: "Jason", h: 73, position: "c", overall: 81, ratings: { defense: 82, shooting: 85, finishing: 80, playmaking: 80, rebounding: 91, athleticism: 70 } },
-  { name: "Bang", h: 70, position: "sg", overall: 79, ratings: { defense: 65, shooting: 92, finishing: 93, playmaking: 87, rebounding: 65, athleticism: 75 } },
-  { name: "Lucas", h: 70, position: "sf", overall: 76, ratings: { defense: 72, shooting: 78, finishing: 76, playmaking: 74, rebounding: 72, athleticism: 83 } },
-  { name: "Rayan", h: 69, position: "sf", overall: 74, ratings: { defense: 72, shooting: 69, finishing: 70, playmaking: 67, rebounding: 78, athleticism: 86 } },
-  { name: "Danny", h: 66, position: "pg", overall: 71, ratings: { defense: 70, shooting: 76, finishing: 68, playmaking: 66, rebounding: 65, athleticism: 78 } },
-  { name: "Brian", h: 65, position: "pg", overall: 70, ratings: { defense: 66, shooting: 72, finishing: 70, playmaking: 67, rebounding: 65, athleticism: 80 } },
-  { name: "Sean", h: 70, position: "pf", overall: 67, ratings: { defense: 67, shooting: 68, finishing: 66, playmaking: 65, rebounding: 67, athleticism: 68 } },
-  { name: "Alfonso", h: 68, position: "sf", overall: 66, ratings: { defense: 66, shooting: 68, finishing: 67, playmaking: 65, rebounding: 65, athleticism: 65 } },
-  { name: "Justin", h: 69, position: "sf", overall: 65, ratings: { defense: 65, shooting: 65, finishing: 65, playmaking: 65, rebounding: 65, athleticism: 66 } },
+  { name: "Taha", h: 74, position: "pg", overall: 96, ratings: { speed: 99, strength: 99, stamina: 99, finishing: 96, rebounding: 88, perimeter_d: 97, interior_d: 97, shooting: 95, playmaking: 99 } },
+  { name: "Brendan", h: 70, position: "sg", overall: 91, ratings: { speed: 96, strength: 96, stamina: 96, finishing: 93, rebounding: 78, perimeter_d: 95, interior_d: 95, shooting: 93, playmaking: 90 } },
+  { name: "Orion", h: 70, position: "sf", overall: 90, ratings: { speed: 96, strength: 96, stamina: 96, finishing: 94, rebounding: 82, perimeter_d: 88, interior_d: 88, shooting: 93, playmaking: 85 } },
+  { name: "Victor", h: 71, position: "pg", overall: 85, ratings: { speed: 84, strength: 84, stamina: 84, finishing: 84, rebounding: 79, perimeter_d: 87, interior_d: 87, shooting: 87, playmaking: 88 } },
+  { name: "Joe", h: 72, position: "sf", overall: 85, ratings: { speed: 76, strength: 76, stamina: 76, finishing: 88, rebounding: 82, perimeter_d: 92, interior_d: 92, shooting: 90, playmaking: 82 } },
+  { name: "Eric", h: 65, position: "pg", overall: 82, ratings: { speed: 90, strength: 90, stamina: 90, finishing: 90, rebounding: 66, perimeter_d: 72, interior_d: 72, shooting: 88, playmaking: 86 } },
+  { name: "Kylan", h: 70, position: "pf", overall: 81, ratings: { speed: 83, strength: 83, stamina: 83, finishing: 79, rebounding: 89, perimeter_d: 81, interior_d: 81, shooting: 71, playmaking: 81 } },
+  { name: "David", h: 66, position: "sg", overall: 81, ratings: { speed: 80, strength: 80, stamina: 80, finishing: 78, rebounding: 70, perimeter_d: 94, interior_d: 94, shooting: 82, playmaking: 80 } },
+  { name: "Jason", h: 73, position: "c", overall: 81, ratings: { speed: 70, strength: 70, stamina: 70, finishing: 80, rebounding: 91, perimeter_d: 82, interior_d: 82, shooting: 85, playmaking: 80 } },
+  { name: "Bang", h: 70, position: "sg", overall: 79, ratings: { speed: 75, strength: 75, stamina: 75, finishing: 93, rebounding: 65, perimeter_d: 65, interior_d: 65, shooting: 92, playmaking: 87 } },
+  { name: "Lucas", h: 70, position: "sf", overall: 76, ratings: { speed: 83, strength: 83, stamina: 83, finishing: 76, rebounding: 72, perimeter_d: 72, interior_d: 72, shooting: 78, playmaking: 74 } },
+  { name: "Rayan", h: 69, position: "sf", overall: 74, ratings: { speed: 86, strength: 86, stamina: 86, finishing: 70, rebounding: 78, perimeter_d: 72, interior_d: 72, shooting: 69, playmaking: 67 } },
+  { name: "Danny", h: 66, position: "pg", overall: 71, ratings: { speed: 78, strength: 78, stamina: 78, finishing: 68, rebounding: 65, perimeter_d: 70, interior_d: 70, shooting: 76, playmaking: 66 } },
+  { name: "Brian", h: 65, position: "pg", overall: 70, ratings: { speed: 80, strength: 80, stamina: 80, finishing: 70, rebounding: 65, perimeter_d: 66, interior_d: 66, shooting: 72, playmaking: 67 } },
+  { name: "Sean", h: 70, position: "pf", overall: 67, ratings: { speed: 68, strength: 68, stamina: 68, finishing: 66, rebounding: 67, perimeter_d: 67, interior_d: 67, shooting: 68, playmaking: 65 } },
+  { name: "Alfonso", h: 68, position: "sf", overall: 66, ratings: { speed: 65, strength: 65, stamina: 65, finishing: 67, rebounding: 65, perimeter_d: 66, interior_d: 66, shooting: 68, playmaking: 65 } },
+  { name: "Justin", h: 69, position: "sf", overall: 65, ratings: { speed: 66, strength: 66, stamina: 66, finishing: 65, rebounding: 65, perimeter_d: 65, interior_d: 65, shooting: 65, playmaking: 65 } },
 ];
 
 const FOOTBALL: Row[] = [

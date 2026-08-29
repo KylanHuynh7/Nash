@@ -2,8 +2,8 @@
  * Issues one comparison link per person and prints them for sending.
  *
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball
- *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts football --axis throwing
- *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts football --base http://192.168.12.176:3000
+ *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball --axis stamina
+ *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball --base http://192.168.12.176:3000
  *
  * ## Why one link each
  *
@@ -15,6 +15,10 @@
  *
  * **Send these individually.** Pasting the whole list into a group chat gives
  * everyone every link and puts the picker back, in a worse form. One DM each.
+ *
+ * **One link per person, not one per question.** A bare link runs the entire
+ * round — every axis flagged `collect` — as sequential blocks inside a single
+ * 80-question sitting.
  *
  * ## Idempotent on purpose
  *
@@ -30,6 +34,7 @@
 import { asc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { players, profiles } from "../db/schema";
+import { SESSION_TARGET } from "../lib/compare";
 import { newRaterToken, raterPath } from "../lib/rater-token";
 import { SPORTS, isSportId } from "../lib/sports";
 
@@ -53,17 +58,25 @@ if (!sport || !isSportId(sport)) {
   process.exit(1);
 }
 
-// Which pass these links are for. Defaults to the sport's first axis, the
-// overall — the number the balancer actually uses, so the one worth collecting
-// first.
-const axis = axisKey
-  ? SPORTS[sport].axes.find((a) => a.key === axisKey)
-  : SPORTS[sport].axes[0];
-if (!axis) {
+/*
+ * What these links ask.
+ *
+ * By default: nothing. A link with no `axis` runs the whole current round —
+ * every axis flagged `collect` — because friends get **one** link, not one per
+ * attribute. Three links is how a round ends up with the third one never
+ * opened.
+ *
+ * `--axis KEY` pins one, which is what a re-send of a single block needs.
+ */
+const round = axisKey
+  ? SPORTS[sport].axes.filter((a) => a.key === axisKey)
+  : SPORTS[sport].axes.filter((a) => a.collect);
+
+if (round.length === 0) {
   console.error(
-    `Unknown axis "${axisKey}" for ${sport}. Configured: ${SPORTS[sport].axes
-      .map((a) => a.key)
-      .join(", ")}`,
+    axisKey
+      ? `Unknown axis "${axisKey}" for ${sport}. Configured: ${SPORTS[sport].axes.map((a) => a.key).join(", ")}`
+      : `${sport} has no axes flagged for collection. Set \`collect: true\` on the ones this round is for.`,
   );
   process.exit(1);
 }
@@ -139,13 +152,19 @@ const roster = await db
 const width = Math.max(...roster.map((r) => r.name.length));
 
 console.log(
-  `${SPORTS[sport].label} / ${axis.label} — ${roster.length} links. Send one each.`,
+  `${SPORTS[sport].label} — ${roster.length} links. Send one each.\n`,
 );
-console.log(`  "${axis.question}"\n`);
+console.log(
+  `  ${SESSION_TARGET} questions, in ${round.length} part(s), on one link:`,
+);
+for (const [i, a] of round.entries()) {
+  console.log(`    ${i + 1}. ${a.label.padEnd(12)} "${a.question}"`);
+}
+console.log();
 for (const person of roster) {
   if (!person.token) continue; // Unreachable: every row was just backfilled.
   console.log(
-    `  ${person.name.padEnd(width)}  ${base}${raterPath(sport, person.token, axis.key)}`,
+    `  ${person.name.padEnd(width)}  ${base}${raterPath(sport, person.token, axisKey)}`,
   );
 }
 console.log();

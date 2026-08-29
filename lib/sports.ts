@@ -7,6 +7,12 @@ export type Attribute = {
   hint: string;
   /** Relative contribution to the overall rating. */
   weight: number;
+  /**
+   * Display grouping, after 2K's player card — several attributes under one
+   * heading. Purely presentational: the overall is a flat weighted mean over
+   * the attributes themselves, and a group carries no weight of its own.
+   */
+  group?: string;
 };
 
 /**
@@ -34,6 +40,15 @@ export type CompareAxis = {
   question: string;
   /** How the axis is named in scripts and links. */
   label: string;
+  /**
+   * Whether this axis is part of the current collection round.
+   *
+   * The unified link walks every axis with this set, in order. It is a
+   * campaign flag rather than a property of the axis: an axis that has been
+   * collected goes back to false rather than being deleted, so its rows keep
+   * their meaning and it can be re-opened later.
+   */
+  collect?: boolean;
   /**
    * The attribute a fit on this axis estimates.
    *
@@ -146,53 +161,129 @@ export const SPORTS: Record<SportId, SportConfig> = {
       // It is also the attribute most likely to be wrong. The stored ratings
       // note Bang's floored 65 as a known soft spot, and one-way players are
       // exactly where a single rater's read is hardest to check.
+      // The three axes of the current round. `collect: true` is what the
+      // unified link walks; "overall" is deliberately absent from it, because
+      // that pass is settled (§0) and re-asking it would spend the budget on a
+      // number nobody is going to change.
       {
-        key: "defense",
-        label: "Defense",
-        attribute: "defense",
-        heading: "Who's the better defender?",
+        key: "stamina",
+        label: "Stamina",
+        attribute: "stamina",
+        collect: true,
+        heading: "Who's still going?",
         question:
-          "Pick who you'd rather have guarding the other team's best player.",
+          "Pick who you'd rather have in the last game of the night.",
+      },
+      {
+        key: "strength",
+        label: "Strength",
+        attribute: "strength",
+        collect: true,
+        heading: "Who's stronger?",
+        question:
+          "Pick who you'd rather have holding position and boxing out.",
+      },
+      {
+        key: "interior_d",
+        label: "Interior D",
+        attribute: "interior_d",
+        collect: true,
+        heading: "Who protects the rim?",
+        question: "Pick who you'd rather have guarding the paint.",
       },
     ],
+    /*
+     * Nine attributes, from an original six.
+     *
+     * Athleticism split into speed/strength/stamina and defense into
+     * perimeter/interior, because badges need attributes to hang on and six
+     * numbers cannot carry a large badge list (context.md §6c). Shooting,
+     * finishing and playmaking were deliberately NOT split: they correlate at
+     * 0.88-0.94, so splitting them mostly produces more correlated things.
+     * Rebounding was not split either — at 0.43 it is already the most
+     * independent number in the set.
+     *
+     * WEIGHTS ARE THE PARENT'S, DIVIDED EVENLY. Athleticism's 1.25 becomes
+     * three attributes of 1.25/3; defense's 1.10 becomes two of 0.55. That is
+     * what makes the split arithmetically neutral: seed each child at its
+     * parent's value and every overall is unchanged to the point, because a
+     * weighted mean over N copies of V with weight w/N contributes exactly
+     * what one copy at weight w did.
+     *
+     * This is also the answer to the objection that splitting punishes lopsided
+     * players (§2c): that only happens when each child inherits the *parent's
+     * full* weight, which multiplies the category's influence by N.
+     */
     attributes: [
       // Weighted for full-court games to 11: you run the whole floor, boards
       // start breaks, and the man who can still go at 9-9 decides it.
+      //
+      // The athleticism family. 1.25 was the heaviest weight in the sport and
+      // stamina is what it was really about — "the man still going at 9-9".
       {
-        key: "athleticism",
-        label: "Athleticism",
-        hint: "Speed, hops, and conditioning — you run all game",
-        weight: 1.25,
+        key: "speed",
+        label: "Speed",
+        hint: "First step, end-to-end burst, beating people down the floor",
+        weight: 1.25 / 3,
+        group: "Physicals",
+      },
+      {
+        key: "strength",
+        label: "Strength",
+        hint: "Holding position, boxing out, finishing through contact",
+        weight: 1.25 / 3,
+        group: "Physicals",
+      },
+      {
+        key: "stamina",
+        label: "Stamina",
+        hint: "Still going at 9-9, game after game",
+        weight: 1.25 / 3,
+        group: "Physicals",
       },
       {
         key: "finishing",
         label: "Finishing",
         hint: "Layups, contact, scoring inside and in transition",
         weight: 1.15,
+        group: "Finishing",
       },
       {
         key: "rebounding",
         label: "Rebounding",
         hint: "Boxing out, second chances, starting the break",
         weight: 1.15,
+        group: "Rebounding",
+      },
+      // The defense family. Guarding Eric and guarding Jason are not the same
+      // job, and the stored height already informs which one someone does.
+      {
+        key: "perimeter_d",
+        label: "Perimeter D",
+        hint: "Staying in front on the ball, fighting over screens",
+        weight: 1.1 / 2,
+        group: "Defense",
       },
       {
-        key: "defense",
-        label: "Defense",
-        hint: "On-ball pressure, help, getting back",
-        weight: 1.1,
+        key: "interior_d",
+        label: "Interior D",
+        hint: "Protecting the rim, help defense, guarding size",
+        weight: 1.1 / 2,
+        group: "Defense",
       },
       {
         key: "shooting",
         label: "Shooting",
         hint: "Catch-and-shoot, range, free throws",
         weight: 1.05,
+        group: "Shooting",
       },
       {
         key: "playmaking",
         label: "Playmaking",
         hint: "Handles, passing, pushing it in transition",
         weight: 1.0,
+        group: "Playmaking",
       },
     ],
     positions: [
