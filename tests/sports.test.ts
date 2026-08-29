@@ -277,6 +277,53 @@ describe("sport config", () => {
     );
   });
 
+  it("attribute families carry the whole weight, and no more", () => {
+    /*
+     * The player card shows a weight per *family*, not per attribute, because
+     * after the split a per-attribute number is arithmetically true and
+     * communicatively false: speed reads x0.42 against playmaking's x1.00, as
+     * though it mattered a quarter as much, when the physicals family is 1.25
+     * — the heaviest thing in the sport. The children share one parent's
+     * weight; they did not each shrink.
+     *
+     * So the family sums have to keep adding up to the flat total the overall
+     * is actually computed from.
+     */
+    for (const sport of Object.values(SPORTS)) {
+      const flat = sport.attributes.reduce((sum, a) => sum + a.weight, 0);
+      const families = new Map<string, number>();
+      for (const a of sport.attributes) {
+        const name = a.group ?? a.label;
+        families.set(name, (families.get(name) ?? 0) + a.weight);
+      }
+      const grouped = [...families.values()].reduce((sum, w) => sum + w, 0);
+      assert.ok(
+        Math.abs(grouped - flat) < 1e-9,
+        `${sport.id}: families sum to ${grouped}, attributes to ${flat}`,
+      );
+    }
+  });
+
+  it("a split family weighs exactly what its parent did", () => {
+    // Athleticism was 1.25 and defense 1.10 before the split. If either family
+    // drifts, every overall silently moves with it.
+    const families = new Map<string, number>();
+    for (const a of SPORTS.basketball.attributes) {
+      const name = a.group ?? a.label;
+      families.set(name, (families.get(name) ?? 0) + a.weight);
+    }
+    assert.ok(Math.abs((families.get("Physicals") ?? 0) - 1.25) < 1e-9);
+    assert.ok(Math.abs((families.get("Defense") ?? 0) - 1.1) < 1e-9);
+    assert.equal(
+      SPORTS.basketball.attributes.filter((a) => a.group === "Physicals").length,
+      3,
+    );
+    assert.equal(
+      SPORTS.basketball.attributes.filter((a) => a.group === "Defense").length,
+      2,
+    );
+  });
+
   it("isSportId accepts only configured sports", () => {
     assert.ok(isSportId("basketball"));
     assert.ok(isSportId("football"));
