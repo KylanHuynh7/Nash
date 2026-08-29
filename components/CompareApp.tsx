@@ -70,6 +70,17 @@ export default function CompareApp({
     rememberToken(token);
   }, [token]);
 
+  /*
+   * Blocks the rater has been shown the handover screen for, this sitting.
+   *
+   * Victor answered a whole strength block as though it were still the stamina
+   * one, and all 27 answers had to be thrown away. The inline "Part 2 of 3 —
+   * Strength" label was not enough: it is small, it is above the fold, and
+   * somebody in a rhythm of tapping names is not reading it. A change of
+   * question now costs a deliberate tap.
+   */
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
+
   const anchors = useMemo(() => anchorPairs(pool), [pool]);
 
   /*
@@ -147,6 +158,16 @@ export default function CompareApp({
 
   const done = axis === null || pair === null;
 
+  /*
+   * Shown before a block nobody has answered yet. Only when the count is zero,
+   * so a rater who stopped halfway through stamina and came back is returned to
+   * their questions rather than made to dismiss a screen they have seen. For
+   * the first block it doubles as the round's introduction.
+   */
+  const introducing =
+    !done && axis !== null && (answered[axis.key]?.size ?? 0) === 0 &&
+    !acknowledged.has(axis.key);
+
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-5 pb-16 pt-6 lg:max-w-xl lg:px-8 lg:pt-10">
       <SportShards accent={config.accent} veil={0.3} />
@@ -159,17 +180,34 @@ export default function CompareApp({
           ← {config.label}
         </Link>
         <h1 className="metal mt-3 text-2xl leading-none">
-          {axis ? axis.heading : "That's the round."}
+          {!axis
+            ? "That's the round."
+            : introducing
+              ? "Who's better?"
+              : axis.heading}
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          {axis
-            ? `${axis.question} Go with your gut — there's no wrong answer, and nobody sees your picks individually.`
-            : "Thanks — that's everything we needed."}
+          {!axis
+            ? "Thanks — that's everything we needed."
+            : introducing
+              ? "Go with your gut — there's no wrong answer, and nobody sees your picks individually."
+              : axis.question}
         </p>
       </header>
 
       {done || !axis ? (
         <Finished count={total} config={config} />
+      ) : introducing ? (
+        <BlockIntro
+          axis={axis}
+          index={blockIndex}
+          count={axes.length}
+          previous={blockIndex > 0 ? axes[blockIndex - 1] : null}
+          questions={targets[blockIndex]}
+          onStart={() =>
+            setAcknowledged((prev) => new Set(prev).add(axis.key))
+          }
+        />
       ) : (
         <>
           <Progress
@@ -208,6 +246,75 @@ export default function CompareApp({
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * The handover between two blocks of a round.
+ *
+ * This exists because a round changed question underneath somebody and he did
+ * not notice. Victor answered an entire strength block as though it were still
+ * the stamina one — 27 good-faith answers to the wrong question, indetectable
+ * in the data, and deleted. The inline part label was there the whole time.
+ *
+ * So the new question is the *only* thing on the screen, and continuing costs
+ * a tap. The cost is one tap per block; the thing it prevents is a third of a
+ * round being silently wrong.
+ */
+function BlockIntro({
+  axis,
+  index,
+  count,
+  previous,
+  questions,
+  onStart,
+}: {
+  axis: CompareAxis;
+  index: number;
+  count: number;
+  previous: CompareAxis | null;
+  questions: number;
+  onStart: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-6 text-center shadow-[var(--shadow-card)]">
+      {previous ? (
+        <p className="text-sm font-semibold text-accent">
+          {previous.label} complete ✓
+        </p>
+      ) : (
+        <p className="eyebrow">
+          {count} short parts, about 5 minutes
+        </p>
+      )}
+
+      <p className="eyebrow mt-4">
+        Part {index + 1} of {count}
+      </p>
+      {/* The whole point of the screen: the question that is about to change,
+          on its own, at a size that cannot be skimmed past.
+
+          Not `.metal` — that is dark brushed steel, tuned for text sitting on
+          the page's silver ground, and it goes nearly invisible on a dark card.
+          Same trap as the amber sit-out badge in the bug list. */}
+      <h2 className="mt-1 text-2xl font-semibold leading-tight text-foreground">
+        {axis.heading}
+      </h2>
+      <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted">
+        {axis.question}
+      </p>
+
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-6 w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:translate-y-px"
+      >
+        {previous ? `Start the ${axis.label.toLowerCase()} questions` : "Start"}
+      </button>
+      <p className="mt-3 text-xs text-ink-soft">
+        {questions} question{questions === 1 ? "" : "s"} in this part
+      </p>
+    </div>
   );
 }
 
