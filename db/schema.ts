@@ -96,6 +96,59 @@ export const runs = pgTable(
 );
 
 /**
+ * One game that was actually played.
+ *
+ * **This is not the winner-stays-on buttons.** Those are a preview control —
+ * people tap them to see the next matchup before walking back on — and
+ * recording them would mix real outcomes with speculative taps with no way to
+ * separate the two, which is worse than no data because it looks like evidence.
+ * The precondition this table was held behind (context.md, "Crowd-sourced
+ * overalls") was a deliberate record-the-result flow distinct from those
+ * buttons. `recordGame` is that flow: it is a separate action, and it will not
+ * accept a result without a final score.
+ *
+ * Why the score and not just the winner: a margin carries far more information
+ * than one bit. 11-2 and 11-10 are very different evidence about the same
+ * winner, and games to 11 make the margin free to collect.
+ *
+ * Why the snapshot, like `runs`: the whole point is to check the ratings
+ * against what happened, so a game has to keep the numbers it was actually
+ * played under. Storing references would let a later re-rating quietly rewrite
+ * the evidence being used to judge it.
+ */
+export const games = pgTable(
+  "games",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sport: text("sport").notNull(),
+    teams: jsonb("teams")
+      .$type<
+        {
+          players: { id: string; name: string; overall: number; position: string }[];
+          /** The team's mean overall at the time it played. */
+          average: number;
+          /** Final score. */
+          score: number;
+        }[]
+      >()
+      .notNull(),
+    /** Index into `teams`. */
+    winner: integer("winner").notNull(),
+    /**
+     * The gap between the two team averages when the game started, x10 as
+     * `runs.spread` is. Stored rather than recomputed because it is the
+     * prediction being tested, and the ratings behind it are expected to move.
+     */
+    predictedSpread: integer("predicted_spread").notNull().default(0),
+    playedAt: timestamp("played_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("games_sport_idx").on(table.sport)],
+);
+
+/**
  * One pairwise judgement: "who'd you rather have, A or B?"
  *
  * The point of this table is that it is the only rating signal in the app that
@@ -222,3 +275,4 @@ export type Profile = typeof profiles.$inferSelect;
 export type Run = typeof runs.$inferSelect;
 export type Comparison = typeof comparisons.$inferSelect;
 export type Tick = typeof ticks.$inferSelect;
+export type Game = typeof games.$inferSelect;
