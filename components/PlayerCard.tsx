@@ -8,9 +8,10 @@ import {
   formatHeight,
   type SportConfig,
 } from "@/lib/sports";
-import { getPlayerComps, type RosterEntry } from "@/app/actions";
+import { getNbaComp, getPlayerComps, type RosterEntry } from "@/app/actions";
 
 type Comp = Awaited<ReturnType<typeof getPlayerComps>>[number];
+type NbaComp = Awaited<ReturnType<typeof getNbaComp>>;
 
 /**
  * Read-only view of one player. Looking at a rating is the common case and
@@ -61,6 +62,7 @@ export default function PlayerCard({
    * roster render would be work nobody asked for.
    */
   const [comps, setComps] = useState<Comp[] | null>(null);
+  const [nba, setNba] = useState<NbaComp | null>(null);
   const [against, setAgainst] = useState<RosterEntry | null>(null);
 
   useEffect(() => {
@@ -73,6 +75,11 @@ export default function PlayerCard({
       // A missing comps section is a smaller failure than a card that will not
       // open, so this degrades to nothing rather than throwing.
       .catch(() => live && setComps([]));
+
+    getNbaComp(config.id, player.id)
+      .then((v) => live && setNba(v))
+      // Same trade as the comps section: a missing line beats a broken card.
+      .catch(() => live && setNba(null));
     return () => {
       live = false;
     };
@@ -227,6 +234,24 @@ export default function PlayerCard({
             </section>
           ))}
         </div>
+
+        {/*
+          The group's NBA comp. A LABEL, never a number - it is not in the
+          overall, not in an attribute, and no fit ever sees it. Hidden below
+          two agreeing votes, because one person's answer printed as "the
+          group" is the failure this card has already had twice.
+        */}
+        {nba?.comp && (
+          <section className="mt-5">
+            <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
+              <h3 className="eyebrow">Plays like</h3>
+              <span className="text-[10px] text-muted">
+                {nba.votes} of {nba.answers} said so
+              </span>
+            </div>
+            <p className="text-lg font-semibold text-foreground">{nba.comp}</p>
+          </section>
+        )}
 
         {comps && comps.length > 0 && (
           <section className="mt-5">

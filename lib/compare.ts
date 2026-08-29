@@ -260,7 +260,7 @@ export function blockTargets(
   axes:
     | number
     | ReadonlyArray<{
-        mode?: "comparative" | "tick";
+        mode?: "comparative" | "tick" | "comp";
         target?: number;
         poolNames?: readonly string[];
       }>,
@@ -271,7 +271,7 @@ export function blockTargets(
   // before tick blocks existed and what the tests pin.
   const list =
     typeof axes === "number"
-      ? Array.from({ length: axes }, () => ({}) as { mode?: "comparative" | "tick"; target?: number; poolNames?: readonly string[] })
+      ? Array.from({ length: axes }, () => ({}) as { mode?: "comparative" | "tick" | "comp"; target?: number; poolNames?: readonly string[] })
       : axes;
   const modes = list.map((a) => a.mode ?? "comparative");
   if (modes.length === 0) return [];
@@ -308,7 +308,18 @@ export function blockTargets(
 
   let seen = 0;
   return modes.map((mode, i) => {
+    // A tick block is one pass: twenty seconds, submitted whole.
     if (mode === "tick") return 1;
+    /*
+     * A comp block is one question per subject, saved as it goes. Counting it
+     * as a single pass would show a rater "1 left" through sixteen questions,
+     * and losing sixteen picks to a closed tab is how a block gets abandoned.
+     * Never includes the rater: nobody is asked who they play like.
+     */
+    if (mode === "comp") {
+      const named = list[i].poolNames?.length ?? poolSize;
+      return Math.max(0, named - 1);
+    }
     if (explicit[i] !== undefined) return explicit[i];
     const target = Math.min(ceiling, base + (seen < extra ? 1 : 0));
     seen++;

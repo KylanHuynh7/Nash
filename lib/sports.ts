@@ -78,10 +78,16 @@ export type CompareAxis = {
    * not do the thing. See context.md 6j for the sparsity rule that decides
    * which an attribute gets.
    *
-   * A tick block never enters `blockTargets`: its cost is one pass, not a
-   * share of SESSION_TARGET.
+   * `comp` is one pass over the whole roster too, but the answer is a NAME
+   * rather than a checkbox: "who does he play like?" picked from a curated NBA
+   * list. It is a label, never a number, and nothing fitted from it reaches the
+   * ratings. It is cheap where a per-axis pairwise verdict is not, because a
+   * comp is one question per player rather than per pair - see context.md 6o.
+   *
+   * Neither `tick` nor `comp` enters `blockTargets`: their cost is one pass,
+   * not a share of SESSION_TARGET.
    */
-  mode?: "comparative" | "tick";
+  mode?: "comparative" | "tick" | "comp";
   /**
    * How many questions this block asks, overriding the shared session budget.
    *
@@ -439,6 +445,23 @@ export const SPORTS: Record<SportId, SportConfig> = {
         prompt: "Which one is the better ball handler?",
         question:
           "Pick who you'd rather have bringing it up against pressure.",
+      },
+      /*
+       * The comp block. Deliberately last in the round: it is the shortest and
+       * the most fun, so it is what a rater arrives at after the grind rather
+       * than the thing that distracts from it.
+       *
+       * No `attribute`, because nothing is fitted from this. A comp is a label
+       * the group applies to a player, and `fit-bt.mts` must never see it.
+       */
+      {
+        key: "nba_comp",
+        heading: "Which NBA player do they play like?",
+        question: "Pick the NBA player each of these reminds you of.",
+        prompt: "Which NBA player does he play like?",
+        label: "NBA Comp",
+        collect: true,
+        mode: "comp",
       },
     ],
     /*

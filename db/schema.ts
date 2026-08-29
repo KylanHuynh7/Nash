@@ -220,5 +220,52 @@ export const ticks = pgTable(
 export type Player = typeof players.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type Run = typeof runs.$inferSelect;
+/**
+ * One rater's NBA comp for one person: "who does Kylan play like?"
+ *
+ * A **row per subject**, like `ticks` and for the same reason — an answered
+ * pass where the rater had no comp in mind for someone stays distinguishable
+ * from a pass nobody opened. `comp` is null for "couldn't think of one", which
+ * is a real answer and not a gap.
+ *
+ * Unique on `(rater, sport, subject)`: one person gets one opinion per rater,
+ * and re-answering updates rather than stacking.
+ *
+ * Why this is cheap where per-axis pairwise verdicts are not (context.md 6l):
+ * a comp is **one question per player**, not per pair. Seventeen players give a
+ * rater sixteen questions, and every player collects one vote per rater — so a
+ * modal answer exists at four raters, with no fit and no density problem.
+ *
+ * It is a label, never a number. Nothing here feeds the ratings.
+ */
+export const comps = pgTable(
+  "comps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sport: text("sport").notNull(),
+    raterId: uuid("rater_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** The NBA player's name, or null for "no comp in mind". */
+    comp: text("comp"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("comps_rater_subject_unique").on(
+      table.raterId,
+      table.sport,
+      table.subjectId,
+    ),
+    index("comps_sport_idx").on(table.sport),
+  ],
+);
+
 export type Comparison = typeof comparisons.$inferSelect;
 export type Tick = typeof ticks.$inferSelect;
+export type Comp = typeof comps.$inferSelect;

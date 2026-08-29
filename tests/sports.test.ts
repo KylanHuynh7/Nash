@@ -254,7 +254,7 @@ describe("sport config", () => {
     );
   });
 
-  it("basketball's round is nine comparative blocks, overall never", () => {
+  it("basketball's round is nine comparative blocks plus the comp block", () => {
     /*
      * The round friends actually receive. Ticks are CLOSED — one person ran
      * them to identify who does what, and their slates are frozen into the
@@ -277,15 +277,36 @@ describe("sport config", () => {
         "interior_d",
         "off_reb",
         "ball_handle",
+        "nba_comp",
       ],
     );
-    // No tick block is in the round any more.
-    assert.ok(collecting.every((a) => (a.mode ?? "comparative") === "comparative"));
-    // Every block states its own depth. Sharing SESSION_TARGET silently
-    // reshapes finished blocks whenever the round grows.
-    for (const a of collecting) {
+    // No tick block is in the round any more, and exactly one comp block is.
+    assert.ok(!collecting.some((a) => a.mode === "tick"));
+    const comps = collecting.filter((a) => a.mode === "comp");
+    assert.equal(comps.length, 1);
+    // Last, because it is the shortest and the most fun - what a rater reaches
+    // after the grind, not what distracts from it.
+    assert.equal(collecting[collecting.length - 1].mode, "comp");
+
+    const comparative = collecting.filter(
+      (a) => (a.mode ?? "comparative") === "comparative",
+    );
+    assert.equal(comparative.length, 9);
+    // Every comparative block states its own depth. Sharing SESSION_TARGET
+    // silently reshapes finished blocks whenever the round grows.
+    for (const a of comparative) {
       assert.ok(a.target && a.target > 0, `${a.key} states no target`);
       assert.ok(a.attribute, `${a.key} collects toward no attribute`);
+    }
+    /*
+     * The comp block states NEITHER, and both absences are deliberate. Its
+     * depth is one question per subject, derived from the pool rather than
+     * declared; and it names no attribute because nothing is fitted from it -
+     * a comp is a label, and fit-bt must never see it.
+     */
+    for (const a of comps) {
+      assert.equal(a.target, undefined, `${a.key} should not state a target`);
+      assert.equal(a.attribute, undefined, `${a.key} must not name an attribute`);
     }
     // The blocks two raters already finished keep the depth they answered
     // against, or those raters silently become incomplete.

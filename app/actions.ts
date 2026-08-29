@@ -4,7 +4,7 @@ import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
-import { comparisons, ticks, players, profiles, runs } from "@/db/schema";
+import { comparisons, comps, ticks, players, profiles, runs } from "@/db/schema";
 import {
   RATING_MAX,
   RATING_MIN,
@@ -14,6 +14,8 @@ import {
   isSportId,
 } from "@/lib/sports";
 import type { BalancePlayer } from "@/lib/balance";
+import { normalizeComp } from "@/lib/nba";
+import { verdict } from "@/lib/comps";
 
 export type RosterEntry = BalancePlayer & {
   ratings: Record<string, number>;
@@ -213,6 +215,14 @@ export type CompareBootstrap = {
 export type AxisBootstrap = CompareBootstrap & {
   axis: string;
   /**
+   * For a comp axis: what this rater has already said, by subject id.
+   *
+   * A key present with a null value means "went through him and had no comp in
+   * mind", which is a real answer and not a gap — the same distinction `ticks`
+   * stores a row per subject to preserve.
+   */
+  comps?: Record<string, string | null>;
+  /**
    * For a tick axis: the subjects this rater already ticked.
    *
    * Present and possibly empty once the pass has been submitted, `undefined`
@@ -235,11 +245,25 @@ export type AxisBootstrap = CompareBootstrap & {
 export async function getRoundBootstrap(
   sport: SportId,
   raterId: string,
-  axes: { key: string; mode?: "comparative" | "tick" }[],
+  axes: { key: string; mode?: "comparative" | "tick" | "comp" }[],
 ): Promise<AxisBootstrap[]> {
   return Promise.all(
     axes.map(async (axis) => {
       const base = await getCompareBootstrap(sport, raterId, axis.key);
+      /*
+       * A comp block resumes per subject, because it saves per subject. The
+       * answered list is the subject ids already picked, which slots straight
+       * into the round's existing count-against-target arithmetic.
+       */
+      if (axis.mode === "comp") {
+        const picked = await getCompState(sport, raterId);
+        return {
+          axis: axis.key,
+          ...base,
+          comps: picked,
+          answered: Object.keys(picked),
+        };
+      }
       if (axis.mode !== "tick") return { axis: axis.key, ...base };
       /*
        * A tick block resumes as "submitted or not", not as a set of answered
@@ -256,6 +280,79 @@ export async function getRoundBootstrap(
       };
     }),
   );
+}
+
+/**
+ * What the group says one player plays like.
+ *
+ * A label, not a rating. Nothing here touches an attribute or the overall, and
+ * the two-vote bar lives in `lib/comps.ts` — one person's answer rendered as
+ * "the group" is the failure this app has already had twice.
+ */
+export async function getNbaComp(sport: string, playerId: string) {
+  const db = getDb();
+  const rows = await db
+    .select({ subjectId: comps.subjectId, comp: comps.comp })
+    .from(comps)
+    .where(and(eq(comps.sport, sport), eq(comps.subjectId, playerId)));
+  return verdict(rows);
+}
+
+/**
+ * Every comp this rater has already given, by subject id.
+ *
+ * Keys are subjects they have been through; a null value is "no comp in mind",
+ * which is why the map is keyed rather than filtered — dropping the nulls would
+ * re-ask a question they already answered.
+ */
+export async function getCompState(
+  sport: string,
+  raterId: string,
+): Promise<Record<string, string | null>> {
+  const db = getDb();
+  const rows = await db
+    .select({ subjectId: comps.subjectId, comp: comps.comp })
+    .from(comps)
+    .where(and(eq(comps.sport, sport), eq(comps.raterId, raterId)));
+  return Object.fromEntries(rows.map((r) => [r.subjectId, r.comp]));
+}
+
+/**
+ * Record one comp: "this person plays like X".
+ *
+ * One subject at a time, so a rater who closes the tab keeps what they gave.
+ * Upserts, so changing your mind replaces rather than stacks.
+ *
+ * A rater is never asked about themselves and it is refused here as well as
+ * filtered in the UI, because this is a public endpoint — the same rule the
+ * comparison and tick actions apply, and the one filter that must not lapse.
+ */
+export async function submitComp(input: {
+  sport: string;
+  raterId: string;
+  sessionId: string;
+  subjectId: string;
+  comp: string | null;
+}) {
+  if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
+  if (input.raterId === input.subjectId) {
+    throw new Error("Nobody is asked who they play like");
+  }
+  const comp = normalizeComp(input.comp);
+
+  await getDb()
+    .insert(comps)
+    .values({
+      sport: input.sport,
+      raterId: input.raterId,
+      sessionId: input.sessionId,
+      subjectId: input.subjectId,
+      comp,
+    })
+    .onConflictDoUpdate({
+      target: [comps.raterId, comps.sport, comps.subjectId],
+      set: { comp, sessionId: input.sessionId },
+    });
 }
 
 /**

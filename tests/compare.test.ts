@@ -260,3 +260,34 @@ describe("round budget", () => {
     assert.deepEqual(blockTargets(0, pool.length), []);
   });
 });
+
+describe("comp blocks", () => {
+  it("costs one question per subject, never counting the rater", () => {
+    // A comp is one question per PLAYER, not per pair - which is exactly why
+    // it is affordable where a per-axis pairwise verdict is not (context.md
+    // 6l). Seventeen players give a rater sixteen questions.
+    const [comp] = blockTargets([{ mode: "comp" }], 17);
+    assert.equal(comp, 16);
+  });
+
+  it("does not take a share of the session budget", () => {
+    // Folding it into the shared division would silently shrink every
+    // comparative block and redefine "complete" for raters who already
+    // finished - the same failure tick blocks were kept out of.
+    const withoutComp = blockTargets([{}, {}, {}], 17, 80);
+    const withComp = blockTargets([{}, {}, {}, { mode: "comp" }], 17, 80);
+    assert.deepEqual(withComp.slice(0, 3), withoutComp);
+  });
+
+  it("respects a restricted slate", () => {
+    const [comp] = blockTargets(
+      [{ mode: "comp", poolNames: ["A", "B", "C", "D"] }],
+      17,
+    );
+    assert.equal(comp, 3);
+  });
+
+  it("asks nothing of a roster of one", () => {
+    assert.deepEqual(blockTargets([{ mode: "comp" }], 1), [0]);
+  });
+});

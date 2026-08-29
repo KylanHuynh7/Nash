@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { submitComparison, submitTicks } from "@/app/actions";
+import { submitComp, submitComparison, submitTicks } from "@/app/actions";
 import type { AxisBootstrap } from "@/app/actions";
 import { rememberToken } from "@/components/CompareLinkGate";
 import SportShards from "@/components/SportShards";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/compare";
 import type { Rater } from "@/lib/rater";
 import type { CompareAxis, SportConfig } from "@/lib/sports";
+import { NBA_COMPS } from "@/lib/nba";
 
 /**
  * The collector — one link, one round, several axes.
@@ -61,9 +62,18 @@ export default function CompareApp({
   const sessionRef = useRef<string | null>(null);
 
   const pool: ComparePlayer[] = round[0].pool;
+  /*
+   * The round's size comes from the WIDEST pool in it, never from block one.
+   *
+   * Block one is a pool-restricted ranking with a frozen nine-name slate, so
+   * reading the roster size off it told the comp block there were eight people
+   * to comp instead of sixteen. The share page already learned this and says
+   * so; this is the same trap one component over.
+   */
+  const widestPool = Math.max(...round.map((r) => r.pool.length));
   const targets = useMemo(
-    () => blockTargets(axes, pool.length),
-    [axes, pool.length],
+    () => blockTargets(axes, widestPool),
+    [axes, widestPool],
   );
 
   useEffect(() => {
@@ -86,6 +96,11 @@ export default function CompareApp({
     Object.fromEntries(
       round.filter((r) => r.ticked).map((r) => [r.axis, new Set(r.ticked)]),
     ),
+  );
+
+  /** Comps already given, by subject id, restored from any earlier sitting. */
+  const [given, setGiven] = useState<Record<string, string | null>>(() =>
+    Object.assign({}, ...round.map((r) => r.comps ?? {})),
   );
 
   const anchors = useMemo(() => anchorPairs(pool), [pool]);
@@ -122,7 +137,10 @@ export default function CompareApp({
   const partsLeft = axes.filter((_, i) => counts[i] < targets[i]).length;
   const secondsLeft = axes.reduce((sum, a, i) => {
     const left = Math.max(0, targets[i] - counts[i]);
-    return sum + (a.mode === "tick" ? left * 20 : left * 4);
+    if (a.mode === "tick") return sum + left * 20;
+    // A comp takes longer than a pairwise tap: you have to think of a name.
+    if (a.mode === "comp") return sum + left * 6;
+    return sum + left * 4;
   }, 0);
 
   const seed = useMemo(() => seedFor(rater.id, total), [rater.id, total]);
@@ -187,6 +205,37 @@ export default function CompareApp({
    * dunking and `throwing` were caught — but only if the empty pass is
    * recorded rather than looking like an unopened block.
    */
+  /*
+   * Record one comp and move to the next subject.
+   *
+   * Saved per subject rather than as one pass, because a comp block is sixteen
+   * questions and losing all of them to a closed tab is how a block gets
+   * abandoned. `null` is a real answer - "no comp in mind" - so it is stored
+   * and counted, not skipped.
+   */
+  function pickComp(subjectId: string, comp: string | null) {
+    if (!axis || axis.mode !== "comp") return;
+    sessionRef.current ??= Math.random().toString(36).slice(2, 10);
+    const axisKey = axis.key;
+
+    setGiven((prev) => ({ ...prev, [subjectId]: comp }));
+    setAnswered((prev) => ({
+      ...prev,
+      [axisKey]: new Set(prev[axisKey]).add(subjectId),
+    }));
+
+    void submitComp({
+      sport: config.id,
+      raterId: rater.id,
+      sessionId: sessionRef.current,
+      subjectId,
+      comp,
+    }).catch(() => {
+      // Same trade as a dropped comparison: a lost answer, not a stalled
+      // session.
+    });
+  }
+
   function submitTickPass() {
     if (!axis || axis.mode !== "tick") return;
     sessionRef.current ??= Math.random().toString(36).slice(2, 10);
@@ -267,6 +316,29 @@ export default function CompareApp({
           secondsLeft={secondsLeft}
           onStart={() => setAcknowledged((prev) => new Set(prev).add(axis.key))}
         />
+      ) : axis.mode === "comp" ? (
+        <>
+          <Progress
+            count={total}
+            target={target}
+            block={blockIndex + 1}
+            blocks={axes.length}
+            label={axis.label}
+            secondsLeft={secondsLeft}
+          />
+          <CompBlock
+            subjects={axisPool.filter(
+              (p) => p.id !== rater.id && !(p.id in given),
+            )}
+            prompt={axis.prompt}
+            onPick={pickComp}
+          />
+          <p className="mt-8 text-center text-xs leading-relaxed text-ink-soft">
+            Rating as{" "}
+            <span className="font-semibold text-ink">{rater.name}</span>.
+            You&apos;ll never be asked about yourself.
+          </p>
+        </>
       ) : axis.mode === "tick" ? (
         <>
           <Progress
@@ -275,6 +347,7 @@ export default function CompareApp({
             block={blockIndex + 1}
             blocks={axes.length}
             label={axis.label}
+            secondsLeft={secondsLeft}
           />
           <p className="mt-6 text-center text-sm font-semibold text-ink">
             {axis.prompt}
@@ -306,6 +379,7 @@ export default function CompareApp({
             block={blockIndex + 1}
             blocks={axes.length}
             label={axis.label}
+            secondsLeft={secondsLeft}
           />
           {/* The question, restated where the decision actually happens. The
               headline is at the top of the page and a rater a dozen answers in
@@ -412,7 +486,10 @@ function BlockIntro({
         {axis.mode === "tick"
           ? "Start"
           : previous
-            ? `Start the ${axis.label.toLowerCase()} questions`
+            // Verbatim, not lowercased: "the nba comp questions" is what
+            // lowercasing an acronym label gets you. Block names read as
+            // proper names everywhere else in this UI too.
+            ? `Start the ${axis.label} questions`
             : "Start"}
       </button>
       <p className="mt-3 text-xs text-ink-soft">
@@ -442,6 +519,149 @@ const EMPTY: ReadonlySet<string> = new Set();
  * Names only, like `Choice` — showing the current rating would anchor the
  * answer to the opinion this page exists to check.
  */
+/**
+ * One subject at a time: "who does he play like?"
+ *
+ * A curated list rather than a text box, because five raters answering freely
+ * about seventeen people produce five different names each and no modal answer
+ * — the feature would collect singletons and never be able to say what the
+ * group thinks. The filter is what keeps a sixty-name list usable on a phone:
+ * anyone who already has a name in mind types three letters and taps.
+ *
+ * "Someone else" and "No idea" both exist because forcing a pick from the list
+ * would manufacture agreement that is not there. A skip is stored as a real
+ * answer, not left as a gap.
+ */
+function CompBlock({
+  subjects,
+  prompt,
+  onPick,
+}: {
+  subjects: ComparePlayer[];
+  prompt: string;
+  onPick: (subjectId: string, comp: string | null) => void;
+}) {
+  const [filter, setFilter] = useState("");
+  const [custom, setCustom] = useState("");
+  const [free, setFree] = useState(false);
+
+  const subject = subjects[0];
+
+  // Cleared per subject, so the previous person's search does not narrow the
+  // list for the next one.
+  function advance(comp: string | null) {
+    if (!subject) return;
+    setFilter("");
+    setCustom("");
+    setFree(false);
+    onPick(subject.id, comp);
+  }
+
+  if (!subject) return null;
+
+  const needle = filter.trim().toLowerCase();
+  const groups = NBA_COMPS.map((g) => ({
+    label: g.label,
+    players: g.players.filter((n) => n.toLowerCase().includes(needle)),
+  })).filter((g) => g.players.length > 0);
+
+  return (
+    <div className="mt-3">
+      <p className="text-center text-sm text-ink-soft">{prompt}</p>
+      <p className="mt-1 text-center text-2xl font-bold text-ink">
+        {subject.name}
+      </p>
+
+      {free ? (
+        <div className="mt-5">
+          <input
+            autoFocus
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            placeholder="Type a name"
+            aria-label="Someone else"
+            className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base text-foreground outline-none focus:border-accent"
+          />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setFree(false)}
+              className="rounded-xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink-soft"
+            >
+              Back to the list
+            </button>
+            <button
+              type="button"
+              disabled={custom.trim() === ""}
+              onClick={() => advance(custom)}
+              className="rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              That&apos;s him
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search"
+            aria-label="Search NBA players"
+            className="mt-4 w-full rounded-xl border border-line bg-surface px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
+          />
+
+          <div className="mt-3 max-h-[46vh] overflow-y-auto pr-0.5">
+            {groups.map((group) => (
+              <section key={group.label} className="mb-3">
+                <h3 className="eyebrow mb-1.5">{group.label}</h3>
+                <ul className="grid gap-1.5">
+                  {group.players.map((name) => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        onClick={() => advance(name)}
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-left text-sm font-semibold text-foreground transition hover:border-accent hover:bg-raised active:translate-y-px"
+                      >
+                        {name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+            {groups.length === 0 && (
+              <p className="py-6 text-center text-sm text-ink-soft">
+                Nobody by that name on the list.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setFree(true)}
+              className="rounded-xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink-soft transition hover:border-accent"
+            >
+              Someone else
+            </button>
+            {/*
+              A skip is an answer. Storing it is what keeps "went through him
+              and had nobody in mind" tellable from "never got that far".
+            */}
+            <button
+              type="button"
+              onClick={() => advance(null)}
+              className="rounded-xl border border-line bg-surface px-4 py-3 text-sm font-semibold text-ink-soft transition hover:border-accent"
+            >
+              No idea — skip
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TickBlock({
   pool,
   ticked,
@@ -535,12 +755,15 @@ function Progress({
   block,
   blocks,
   label,
+  secondsLeft,
 }: {
   count: number;
   target: number;
   block: number;
   blocks: number;
   label: string;
+  /** Mode-aware, from the caller - a comp costs more than a pairwise tap. */
+  secondsLeft: number;
 }) {
   const pct = Math.min(100, (count / target) * 100);
   return (
@@ -550,7 +773,7 @@ function Progress({
           {count} of {target}
         </span>
         <span className="text-xs text-ink-soft">
-          {remaining(count, target)}
+          {remaining(secondsLeft, Math.max(0, target - count))}
         </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
@@ -571,11 +794,19 @@ function Progress({
   );
 }
 
-/** Four seconds a question, rounded up, so nobody is promised a minute at 55 left. */
-function remaining(count: number, target: number): string {
-  const left = Math.max(0, target - count);
-  const minutes = Math.ceil((left * 4) / 60);
+/**
+ * Rounded up, so nobody is promised a minute at 55 questions left.
+ *
+ * Takes the seconds rather than recomputing them. It used to assume four
+ * seconds for every remaining question in the round, which was true while every
+ * block was pairwise and quietly wrong once they were not: a comp block at six
+ * seconds a question read as "under a minute" on ninety seconds of work. The
+ * caller already knows what each block costs; two estimates that disagree is
+ * one estimate too many.
+ */
+function remaining(secondsLeft: number, left: number): string {
   if (left === 0) return "done";
+  const minutes = Math.ceil(secondsLeft / 60);
   return minutes <= 1 ? "under a minute left" : `about ${minutes} min left`;
 }
 
