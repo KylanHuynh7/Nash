@@ -28,7 +28,9 @@ export const players = pgTable("players", {
    * missing token as "no link issued yet" rather than as an error.
    */
   raterToken: text("rater_token").unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /** A person's ratings for one sport. Someone who hoops and plays football has two. */
@@ -45,7 +47,9 @@ export const profiles = pgTable(
     ratings: jsonb("ratings").$type<Record<string, number>>().notNull(),
     /** Denormalised weighted average so lists can sort without recomputing. */
     overall: integer("overall").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     unique("profiles_player_sport_unique").on(table.playerId, table.sport),
@@ -84,7 +88,9 @@ export const runs = pgTable(
       >()
       .notNull(),
     spread: integer("spread").notNull().default(0),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [index("runs_sport_idx").on(table.sport)],
 );
@@ -155,7 +161,64 @@ export const comparisons = pgTable(
   ],
 );
 
+/**
+ * One rater's answer to a whole-roster filter: "tick everyone who posts up."
+ *
+ * This is the second collection shape in the app and it exists because the
+ * first one is expensive. A comparison costs ~30 questions to rank seventeen
+ * people, which is the right spend when the calls are close and the ordering
+ * is the product. It is waste when most of the roster is at the floor: asking
+ * "who blocks more shots, Jason or Alfonso?" thirty times to learn that Jason
+ * blocks shots and Alfonso does not.
+ *
+ * A tick pass asks the roster once, in about twenty seconds, and answers *who*
+ * rather than *how good*. The ranking, if it is ever wanted, is a comparative
+ * run afterwards over only the ticked pool — and with three to eight people
+ * that is an exhaustive round-robin of 3-28 pairs, cheaper AND gapless
+ * compared to sampling 30 questions across all seventeen. See context.md 6j.
+ *
+ * **A row per subject, not a row per tick.** Storing only the ticked players
+ * would make "went through the pass and ticked nobody" indistinguishable from
+ * "never opened the block", and the difference matters: the first is evidence
+ * that an attribute is a constant, which is exactly how dunking and `throwing`
+ * were caught. Seventeen rows per rater per axis is cheap; an ambiguity that
+ * silently reads as missing data is not.
+ */
+export const ticks = pgTable(
+  "ticks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sport: text("sport").notNull(),
+    /** The attribute this pass filters for — `post_control`, `block`, ... */
+    axis: text("axis").notNull(),
+    raterId: uuid("rater_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Groups one sitting, so a rushed pass can be dropped like a comparison. */
+    sessionId: text("session_id").notNull(),
+    /** The person being judged. */
+    subjectId: uuid("subject_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    /** Whether this rater says the subject does the thing. */
+    ticked: integer("ticked").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("ticks_rater_subject_unique").on(
+      table.raterId,
+      table.sport,
+      table.axis,
+      table.subjectId,
+    ),
+    index("ticks_sport_axis_idx").on(table.sport, table.axis),
+  ],
+);
+
 export type Player = typeof players.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type Run = typeof runs.$inferSelect;
 export type Comparison = typeof comparisons.$inferSelect;
+export type Tick = typeof ticks.$inferSelect;

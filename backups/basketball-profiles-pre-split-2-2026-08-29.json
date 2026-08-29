@@ -1,0 +1,257 @@
+[
+  {
+    "id": "b6986e2c-f8c7-4907-922f-4cc2c718f7e8",
+    "ratings": {
+      "speed": 80,
+      "stamina": 80,
+      "shooting": 72,
+      "strength": 80,
+      "finishing": 70,
+      "interior_d": 66,
+      "playmaking": 67,
+      "rebounding": 65,
+      "perimeter_d": 66
+    },
+    "overall": 70
+  },
+  {
+    "id": "6b767736-bc3c-4363-8f13-84ca23e3f7ad",
+    "ratings": {
+      "speed": 68,
+      "stamina": 68,
+      "shooting": 68,
+      "strength": 68,
+      "finishing": 66,
+      "interior_d": 67,
+      "playmaking": 65,
+      "rebounding": 67,
+      "perimeter_d": 67
+    },
+    "overall": 67
+  },
+  {
+    "id": "d6f3b9cc-7773-4c30-bc52-ab3660940afd",
+    "ratings": {
+      "speed": 65,
+      "stamina": 65,
+      "shooting": 68,
+      "strength": 65,
+      "finishing": 67,
+      "interior_d": 66,
+      "playmaking": 65,
+      "rebounding": 65,
+      "perimeter_d": 66
+    },
+    "overall": 66
+  },
+  {
+    "id": "f2b284d4-1f03-45a7-9e14-880bd36d2987",
+    "ratings": {
+      "speed": 99,
+      "stamina": 99,
+      "shooting": 95,
+      "strength": 99,
+      "finishing": 96,
+      "interior_d": 97,
+      "playmaking": 99,
+      "rebounding": 88,
+      "perimeter_d": 97
+    },
+    "overall": 96
+  },
+  {
+    "id": "9605588e-007d-41dd-a191-21d04429fd22",
+    "ratings": {
+      "speed": 96,
+      "stamina": 96,
+      "shooting": 93,
+      "strength": 96,
+      "finishing": 94,
+      "interior_d": 88,
+      "playmaking": 85,
+      "rebounding": 82,
+      "perimeter_d": 88
+    },
+    "overall": 90
+  },
+  {
+    "id": "85b5fda7-ee7f-4bd5-845e-3182cd47a73f",
+    "ratings": {
+      "speed": 84,
+      "stamina": 84,
+      "shooting": 87,
+      "strength": 84,
+      "finishing": 84,
+      "interior_d": 87,
+      "playmaking": 88,
+      "rebounding": 79,
+      "perimeter_d": 87
+    },
+    "overall": 85
+  },
+  {
+    "id": "1081a67b-2de8-4802-8d72-679356bcc226",
+    "ratings": {
+      "speed": 90,
+      "stamina": 90,
+      "shooting": 88,
+      "strength": 90,
+      "finishing": 90,
+      "interior_d": 72,
+      "playmaking": 86,
+      "rebounding": 66,
+      "perimeter_d": 72
+    },
+    "overall": 82
+  },
+  {
+    "id": "df4486e5-edba-4733-bc80-d82a78e3c70b",
+    "ratings": {
+      "speed": 80,
+      "stamina": 80,
+      "shooting": 82,
+      "strength": 80,
+      "finishing": 78,
+      "interior_d": 94,
+      "playmaking": 80,
+      "rebounding": 70,
+      "perimeter_d": 94
+    },
+    "overall": 81
+  },
+  {
+    "id": "9a2ce497-f22b-407c-ba0f-e4fdebf03e54",
+    "ratings": {
+      "speed": 70,
+      "stamina": 70,
+      "shooting": 85,
+      "strength": 70,
+      "finishing": 80,
+      "interior_d": 82,
+      "playmaking": 80,
+      "rebounding": 91,
+      "perimeter_d": 82
+    },
+    "overall": 81
+  },
+  {
+    "id": "c181ff26-9968-4146-a6d4-8681496a0d85",
+    "ratings": {
+      "speed": 76,
+      "stamina": 76,
+      "shooting": 90,
+      "strength": 76,
+      "finishing": 88,
+      "interior_d": 92,
+      "playmaking": 82,
+      "rebounding": 82,
+      "perimeter_d": 92
+    },
+    "overall": 85
+  },
+  {
+    "id": "12eae4f1-a6ee-43b5-8a96-803ebaa9d493",
+    "ratings": {
+      "speed": 66,
+      "stamina": 66,
+      "shooting": 70,
+      "strength": 66,
+      "finishing": 65,
+      "interior_d": 65,
+      "playmaking": 65,
+      "rebounding": 65,
+      "perimeter_d": 65
+    },
+    "overall": 66
+  },
+  {
+    "id": "ca5e50db-4222-4958-b7be-91f660482f86",
+    "ratings": {
+      "speed": 96,
+      "stamina": 96,
+      "shooting": 93,
+      "strength": 96,
+      "finishing": 93,
+      "interior_d": 95,
+      "playmaking": 90,
+      "rebounding": 78,
+      "perimeter_d": 95
+    },
+    "overall": 91
+  },
+  {
+    "id": "4676cc38-4328-40a8-90c4-c583f644a0f5",
+    "ratings": {
+      "speed": 83,
+      "stamina": 83,
+      "shooting": 71,
+      "strength": 83,
+      "finishing": 79,
+      "interior_d": 81,
+      "playmaking": 81,
+      "rebounding": 89,
+      "perimeter_d": 81
+    },
+    "overall": 81
+  },
+  {
+    "id": "98df2d49-5cd5-4c1e-b5b2-52a41164859e",
+    "ratings": {
+      "speed": 75,
+      "stamina": 75,
+      "shooting": 92,
+      "strength": 75,
+      "finishing": 93,
+      "interior_d": 65,
+      "playmaking": 87,
+      "rebounding": 65,
+      "perimeter_d": 65
+    },
+    "overall": 79
+  },
+  {
+    "id": "ff7c3b60-5780-4ce8-a786-cee0636b6d79",
+    "ratings": {
+      "speed": 83,
+      "stamina": 83,
+      "shooting": 78,
+      "strength": 83,
+      "finishing": 76,
+      "interior_d": 72,
+      "playmaking": 74,
+      "rebounding": 72,
+      "perimeter_d": 72
+    },
+    "overall": 76
+  },
+  {
+    "id": "983981bc-d78f-4c48-a78c-b2269552b139",
+    "ratings": {
+      "speed": 86,
+      "stamina": 86,
+      "shooting": 69,
+      "strength": 86,
+      "finishing": 70,
+      "interior_d": 72,
+      "playmaking": 67,
+      "rebounding": 78,
+      "perimeter_d": 72
+    },
+    "overall": 74
+  },
+  {
+    "id": "8ce6d010-2aea-4732-b029-741ff63a7a64",
+    "ratings": {
+      "speed": 78,
+      "stamina": 78,
+      "shooting": 76,
+      "strength": 78,
+      "finishing": 68,
+      "interior_d": 70,
+      "playmaking": 66,
+      "rebounding": 65,
+      "perimeter_d": 70
+    },
+    "overall": 71
+  }
+]

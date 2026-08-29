@@ -168,7 +168,8 @@ export function nextPair(options: PickOptions): Pair | null {
     }
   }
 
-  const candidates: { a: ComparePlayer; b: ComparePlayer; weight: number }[] = [];
+  const candidates: { a: ComparePlayer; b: ComparePlayer; weight: number }[] =
+    [];
   let total = 0;
   for (let i = 0; i < eligible.length; i++) {
     for (let j = i + 1; j < eligible.length; j++) {
@@ -256,17 +257,63 @@ export const SESSION_TARGET = 80;
  * what is actually available too — a rater cannot answer more pairs than exist.
  */
 export function blockTargets(
-  axisCount: number,
+  axes:
+    | number
+    | ReadonlyArray<{
+        mode?: "comparative" | "tick";
+        target?: number;
+        poolNames?: readonly string[];
+      }>,
   poolSize: number,
   total: number = SESSION_TARGET,
 ): number[] {
-  if (axisCount <= 0) return [];
+  // A plain count is every-axis-comparative, which is what the round was
+  // before tick blocks existed and what the tests pin.
+  const list =
+    typeof axes === "number"
+      ? Array.from({ length: axes }, () => ({}) as { mode?: "comparative" | "tick"; target?: number; poolNames?: readonly string[] })
+      : axes;
+  const modes = list.map((a) => a.mode ?? "comparative");
+  if (modes.length === 0) return [];
+
+  /*
+   * An axis that states its own target gets it, capped by what its own pool
+   * can actually supply. A block restricted to four players holds six pairs;
+   * asking for twenty-five would leave it permanently incomplete and stall the
+   * round on a block nobody can finish.
+   */
+  const explicit = list.map((a) => {
+    if (a.target === undefined) return undefined;
+    const n = a.poolNames ? a.poolNames.length : poolSize;
+    return Math.min(a.target, availablePairs(n, true));
+  });
+
+  /*
+   * Tick blocks cost one pass and are NOT a share of SESSION_TARGET.
+   *
+   * This is load bearing. `SESSION_TARGET / axisCount` was correct while every
+   * axis was comparative, but folding four tick axes into that division would
+   * have dropped each comparative block from 27 questions to 12 — silently
+   * redefining "complete" for a round two people had already partly answered.
+   * Justin finished 27/27/26 under the old division; he must still read as
+   * finished after the ticks land.
+   */
   const ceiling = availablePairs(poolSize, true);
-  const base = Math.floor(total / axisCount);
-  const extra = total % axisCount;
-  return Array.from({ length: axisCount }, (_, i) =>
-    Math.min(ceiling, base + (i < extra ? 1 : 0)),
-  );
+  // Only axes WITHOUT a stated target share the legacy session budget.
+  const sharing = modes.filter(
+    (m, i) => m === "comparative" && explicit[i] === undefined,
+  ).length;
+  const base = sharing === 0 ? 0 : Math.floor(total / sharing);
+  const extra = sharing === 0 ? 0 : total % sharing;
+
+  let seen = 0;
+  return modes.map((mode, i) => {
+    if (mode === "tick") return 1;
+    if (explicit[i] !== undefined) return explicit[i];
+    const target = Math.min(ceiling, base + (seen < extra ? 1 : 0));
+    seen++;
+    return target;
+  });
 }
 
 /**

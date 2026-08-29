@@ -49,7 +49,7 @@ const keys = round.map((a) => a.key);
 const poolSize = (
   await db.select({ n: players.name }).from(players)
 ).length;
-const perBlock = blockTargets(round.length, poolSize);
+const perBlock = blockTargets(round, poolSize);
 
 const byPerson = new Map<string, Map<string, number>>();
 const sittings = new Map<string, Set<string>>();

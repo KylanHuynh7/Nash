@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { submitComparison } from "@/app/actions";
+import { submitComparison, submitTicks } from "@/app/actions";
 import type { AxisBootstrap } from "@/app/actions";
 import { rememberToken } from "@/components/CompareLinkGate";
 import SportShards from "@/components/SportShards";
@@ -62,8 +62,8 @@ export default function CompareApp({
 
   const pool: ComparePlayer[] = round[0].pool;
   const targets = useMemo(
-    () => blockTargets(axes.length, pool.length),
-    [axes.length, pool.length],
+    () => blockTargets(axes, pool.length),
+    [axes, pool.length],
   );
 
   useEffect(() => {
@@ -80,6 +80,13 @@ export default function CompareApp({
    * question now costs a deliberate tap.
    */
   const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
+
+  /** Boxes currently on, per tick axis, restored from any earlier sitting. */
+  const [ticked, setTicked] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(
+      round.filter((r) => r.ticked).map((r) => [r.axis, new Set(r.ticked)]),
+    ),
+  );
 
   const anchors = useMemo(() => anchorPairs(pool), [pool]);
 
@@ -102,10 +109,23 @@ export default function CompareApp({
     ? (round.find((r) => r.axis === axis.key)?.pool ?? pool)
     : pool;
 
-  const seed = useMemo(
-    () => seedFor(rater.id, total),
-    [rater.id, total],
-  );
+  /*
+   * What is actually LEFT, for the intro card.
+   *
+   * The card used to say "7 short parts, about 5 minutes" to everybody,
+   * including a returning rater with 80 of 84 already answered and four
+   * twenty-second passes to go. Overstating the remaining work to somebody who
+   * has nearly finished is the same mistake as understating it: it is the
+   * moment a session gets put down. Counted from the blocks that are actually
+   * incomplete, at roughly four seconds a comparison and twenty a tick pass.
+   */
+  const partsLeft = axes.filter((_, i) => counts[i] < targets[i]).length;
+  const secondsLeft = axes.reduce((sum, a, i) => {
+    const left = Math.max(0, targets[i] - counts[i]);
+    return sum + (a.mode === "tick" ? left * 20 : left * 4);
+  }, 0);
+
+  const seed = useMemo(() => seedFor(rater.id, total), [rater.id, total]);
 
   const pair: Pair | null = useMemo(() => {
     if (!axis) return null;
@@ -156,7 +176,44 @@ export default function CompareApp({
     });
   }
 
-  const done = axis === null || pair === null;
+  // A tick block has no pair, so pairlessness only ends the round for a
+  // comparative one.
+  /*
+   * Submit one whole tick pass.
+   *
+   * Every subject is sent with its state, not just the ticked ones, so that a
+   * pass where nobody was ticked is stored as a real answer. An attribute that
+   * comes back with zero ticks from everybody is a constant, which is how
+   * dunking and `throwing` were caught — but only if the empty pass is
+   * recorded rather than looking like an unopened block.
+   */
+  function submitTickPass() {
+    if (!axis || axis.mode !== "tick") return;
+    sessionRef.current ??= Math.random().toString(36).slice(2, 10);
+    const axisKey = axis.key;
+    const on = ticked[axisKey] ?? new Set<string>();
+    const subjects = axisPool
+      .filter((p) => p.id !== rater.id)
+      .map((p) => ({ id: p.id, ticked: on.has(p.id) }));
+
+    setAnswered((prev) => ({
+      ...prev,
+      [axisKey]: new Set(prev[axisKey]).add("tick"),
+    }));
+
+    void submitTicks({
+      sport: config.id,
+      axis: axisKey,
+      raterId: rater.id,
+      sessionId: sessionRef.current,
+      subjects,
+    }).catch(() => {
+      // Same trade as a dropped comparison: a lost pass is a lost data point,
+      // not a stalled session.
+    });
+  }
+
+  const done = axis === null || (axis.mode !== "tick" && pair === null);
 
   /*
    * Shown before a block nobody has answered yet. Only when the count is zero,
@@ -165,7 +222,9 @@ export default function CompareApp({
    * the first block it doubles as the round's introduction.
    */
   const introducing =
-    !done && axis !== null && (answered[axis.key]?.size ?? 0) === 0 &&
+    !done &&
+    axis !== null &&
+    (answered[axis.key]?.size ?? 0) === 0 &&
     !acknowledged.has(axis.key);
 
   return (
@@ -204,11 +263,42 @@ export default function CompareApp({
           count={axes.length}
           previous={blockIndex > 0 ? axes[blockIndex - 1] : null}
           questions={targets[blockIndex]}
-          onStart={() =>
-            setAcknowledged((prev) => new Set(prev).add(axis.key))
-          }
+          partsLeft={partsLeft}
+          secondsLeft={secondsLeft}
+          onStart={() => setAcknowledged((prev) => new Set(prev).add(axis.key))}
         />
-      ) : (
+      ) : axis.mode === "tick" ? (
+        <>
+          <Progress
+            count={total}
+            target={target}
+            block={blockIndex + 1}
+            blocks={axes.length}
+            label={axis.label}
+          />
+          <p className="mt-6 text-center text-sm font-semibold text-ink">
+            {axis.prompt}
+          </p>
+          <TickBlock
+            pool={axisPool.filter((p) => p.id !== rater.id)}
+            ticked={ticked[axis.key] ?? EMPTY}
+            onToggle={(id) =>
+              setTicked((prev) => {
+                const next = new Set(prev[axis.key] ?? []);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return { ...prev, [axis.key]: next };
+              })
+            }
+            onSubmit={submitTickPass}
+          />
+          <p className="mt-8 text-center text-xs leading-relaxed text-ink-soft">
+            Rating as{" "}
+            <span className="font-semibold text-ink">{rater.name}</span>.
+            You&apos;ll never be asked about yourself.
+          </p>
+        </>
+      ) : pair ? (
         <>
           <Progress
             count={total}
@@ -240,11 +330,12 @@ export default function CompareApp({
             Too close to call
           </button>
           <p className="mt-8 text-center text-xs leading-relaxed text-ink-soft">
-            Rating as <span className="font-semibold text-ink">{rater.name}</span>.
+            Rating as{" "}
+            <span className="font-semibold text-ink">{rater.name}</span>.
             You&apos;ll never be asked about yourself.
           </p>
         </>
-      )}
+      ) : null}
     </main>
   );
 }
@@ -267,6 +358,8 @@ function BlockIntro({
   count,
   previous,
   questions,
+  partsLeft,
+  secondsLeft,
   onStart,
 }: {
   axis: CompareAxis;
@@ -274,6 +367,10 @@ function BlockIntro({
   count: number;
   previous: CompareAxis | null;
   questions: number;
+  /** Blocks still incomplete, including this one. */
+  partsLeft: number;
+  /** Rough seconds of work left across those blocks. */
+  secondsLeft: number;
   onStart: () => void;
 }) {
   return (
@@ -284,7 +381,10 @@ function BlockIntro({
         </p>
       ) : (
         <p className="eyebrow">
-          {count} short parts, about 5 minutes
+          {partsLeft} short part{partsLeft === 1 ? "" : "s"}, about{" "}
+          {secondsLeft < 90
+            ? "a minute"
+            : `${Math.round(secondsLeft / 60)} minutes`}
         </p>
       )}
 
@@ -309,11 +409,98 @@ function BlockIntro({
         onClick={onStart}
         className="mt-6 w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:translate-y-px"
       >
-        {previous ? `Start the ${axis.label.toLowerCase()} questions` : "Start"}
+        {axis.mode === "tick"
+          ? "Start"
+          : previous
+            ? `Start the ${axis.label.toLowerCase()} questions`
+            : "Start"}
       </button>
       <p className="mt-3 text-xs text-ink-soft">
-        {questions} question{questions === 1 ? "" : "s"} in this part
+        {axis.mode === "tick"
+          ? "One quick pass through the roster"
+          : `${questions} question${questions === 1 ? "" : "s"} in this part`}
       </p>
+    </div>
+  );
+}
+
+const EMPTY: ReadonlySet<string> = new Set();
+
+/**
+ * One pass over the whole roster: tick everyone who does the thing.
+ *
+ * The second collection shape in the app, and the reason the attribute tree
+ * could grow to fifteen without asking anybody for twenty minutes of tapping.
+ * A comparative block spends ~30 questions to rank seventeen people, which is
+ * right when the calls are close and wrong when most of the roster is at the
+ * floor. This asks the roster once, in about twenty seconds.
+ *
+ * Deliberately NOT a list of pair buttons: the whole saving is that the rater
+ * reads seventeen names once and recalls a fact about each, rather than
+ * re-deciding the same person against a dozen opponents.
+ *
+ * Names only, like `Choice` — showing the current rating would anchor the
+ * answer to the opinion this page exists to check.
+ */
+function TickBlock({
+  pool,
+  ticked,
+  onToggle,
+  onSubmit,
+}: {
+  pool: ComparePlayer[];
+  ticked: ReadonlySet<string>;
+  onToggle: (id: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="mt-3">
+      <ul className="grid gap-2">
+        {pool.map((p) => {
+          const on = ticked.has(p.id);
+          return (
+            <li key={p.id}>
+              <button
+                type="button"
+                aria-pressed={on}
+                onClick={() => onToggle(p.id)}
+                className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-base font-semibold transition active:translate-y-px ${
+                  on
+                    ? "border-accent bg-raised text-foreground"
+                    : "border-line bg-surface text-ink-soft hover:border-accent/50"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
+                    on
+                      ? "border-accent bg-accent text-white"
+                      : "border-line bg-transparent"
+                  }`}
+                >
+                  {on ? "✓" : ""}
+                </span>
+                {p.name}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/*
+        Always enabled, including with nothing ticked. An empty pass is a real
+        answer — it says this attribute may be a constant — and disabling the
+        button would quietly convert that finding into an abandoned block.
+      */}
+      <button
+        type="button"
+        onClick={onSubmit}
+        className="mt-5 w-full rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 active:translate-y-px"
+      >
+        {ticked.size === 0
+          ? "Nobody — next part"
+          : `Done — ${ticked.size} ticked`}
+      </button>
     </div>
   );
 }
@@ -362,7 +549,9 @@ function Progress({
         <span className="eyebrow">
           {count} of {target}
         </span>
-        <span className="text-xs text-ink-soft">{remaining(count, target)}</span>
+        <span className="text-xs text-ink-soft">
+          {remaining(count, target)}
+        </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
         <div
@@ -374,7 +563,8 @@ function Progress({
           question changed answers the next block as if it were the last one. */}
       {blocks > 1 && (
         <p className="mt-2 text-xs text-ink-soft">
-          Part {block} of {blocks} — <span className="font-semibold text-ink">{label}</span>
+          Part {block} of {blocks} —{" "}
+          <span className="font-semibold text-ink">{label}</span>
         </p>
       )}
     </div>

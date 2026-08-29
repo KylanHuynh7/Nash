@@ -71,7 +71,7 @@ export default async function ComparePage(
     round_data = await getRoundBootstrap(
       sport,
       rater.id,
-      round.map((a) => a.key),
+      round.map((a) => ({ key: a.key, mode: a.mode })),
     );
   } catch {
     return (
@@ -86,7 +86,9 @@ export default async function ComparePage(
     );
   }
 
-  if (round_data[0].pool.length < 3) notFound();
+  // The FIRST block may be a small pool block, so the roster check has to look
+  // at the widest pool in the round rather than at block one.
+  if (Math.max(...round_data.map((r) => r.pool.length)) < 3) notFound();
 
   return (
     <div className="flex flex-1 flex-col" style={chrome}>

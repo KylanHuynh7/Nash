@@ -254,26 +254,66 @@ describe("sport config", () => {
     );
   });
 
-  it("basketball collects the three split attributes, not offensive ones", () => {
+  it("basketball's round is nine comparative blocks, overall never", () => {
     /*
-     * Shooting, finishing and playmaking correlate at 0.88-0.94 and carry
-     * about half the weight between them — one thing measured three times — so
-     * a pass on any of them would largely reproduce the overall pass already
-     * collected. The round collects the attributes that were split instead,
-     * which are the ones holding no data of their own yet.
+     * The round friends actually receive. Ticks are CLOSED — one person ran
+     * them to identify who does what, and their slates are frozen into the
+     * `poolNames` of the ranking blocks, so no rater is asked to tick anything.
+     *
+     * Ordered so an abandoned tail costs least: the four pool rankings first
+     * (shortest blocks, most novel data), then the three in-flight axes, then
+     * the two most redundant with what is already collected.
      */
     const collecting = SPORTS.basketball.axes.filter((a) => a.collect);
     assert.deepEqual(
       collecting.map((a) => a.key),
-      ["stamina", "strength", "interior_d"],
+      [
+        "post_control_rank",
+        "block_rank",
+        "steal_rank",
+        "three_point_rank",
+        "stamina",
+        "strength",
+        "interior_d",
+        "off_reb",
+        "ball_handle",
+      ],
     );
-    for (const axis of collecting) {
-      assert.ok(axis.attribute, `${axis.key} collects toward no attribute`);
+    // No tick block is in the round any more.
+    assert.ok(collecting.every((a) => (a.mode ?? "comparative") === "comparative"));
+    // Every block states its own depth. Sharing SESSION_TARGET silently
+    // reshapes finished blocks whenever the round grows.
+    for (const a of collecting) {
+      assert.ok(a.target && a.target > 0, `${a.key} states no target`);
+      assert.ok(a.attribute, `${a.key} collects toward no attribute`);
     }
+    // The blocks two raters already finished keep the depth they answered
+    // against, or those raters silently become incomplete.
+    const depth = Object.fromEntries(collecting.map((a) => [a.key, a.target]));
+    assert.equal(depth.stamina, 27);
+    assert.equal(depth.strength, 27);
+    assert.equal(depth.interior_d, 26);
+
+    // A pool block can never ask for more pairs than its slate holds.
+    for (const a of collecting) {
+      if (!a.poolNames) continue;
+      const n = a.poolNames.length;
+      assert.ok(n >= 3, `${a.key} slate of ${n} is too small to rank`);
+      assert.ok(
+        a.target! <= (n * (n - 1)) / 2,
+        `${a.key} wants ${a.target} from a slate holding ${(n * (n - 1)) / 2} pairs`,
+      );
+      // A slate must name real people.
+      const roster = new Set(basketballRows.map((r) => r.name));
+      for (const name of a.poolNames) {
+        assert.ok(roster.has(name), `${a.key} slate names unknown player ${name}`);
+      }
+    }
+
     // The settled overall pass must never be reopened by the unified link.
     assert.ok(
       !SPORTS.basketball.axes.find((a) => a.key === "overall")?.collect,
-      "the overall pass is settled and must not be re-collected",
+      "the overall pass is settled and must not be recollected",
     );
   });
 
@@ -312,15 +352,42 @@ describe("sport config", () => {
       const name = a.group ?? a.label;
       families.set(name, (families.get(name) ?? 0) + a.weight);
     }
-    assert.ok(Math.abs((families.get("Physicals") ?? 0) - 1.25) < 1e-9);
-    assert.ok(Math.abs((families.get("Defense") ?? 0) - 1.1) < 1e-9);
-    assert.equal(
-      SPORTS.basketball.attributes.filter((a) => a.group === "Physicals").length,
-      3,
+    /*
+     * Every family carries its parent's original weight, whatever the children
+     * are divided into. This is what makes a split arithmetically neutral: the
+     * children's weights only have to SUM to the parent's, so an uneven split
+     * is as valid as an even one, and adding a child later never changes the
+     * family's influence on the overall.
+     *
+     * Asserted per family rather than as attribute counts, because counts pin
+     * a shape that is expected to keep changing - this test failed on the six
+     * -> nine -> fifteen split for saying "Defense has 2".
+     */
+    const PARENTS: Record<string, number> = {
+      Physicals: 1.25,
+      Finishing: 1.15,
+      Rebounding: 1.15,
+      Defense: 1.1,
+      Shooting: 1.05,
+      Playmaking: 1.0,
+    };
+    for (const [family, weight] of Object.entries(PARENTS)) {
+      assert.ok(
+        Math.abs((families.get(family) ?? 0) - weight) < 1e-9,
+        `${family} should carry ${weight}, carries ${families.get(family)}`,
+      );
+    }
+    // No attribute belongs to a family that isn't one of the six.
+    assert.deepEqual(
+      [...families.keys()].filter((f) => !(f in PARENTS)),
+      [],
     );
-    assert.equal(
-      SPORTS.basketball.attributes.filter((a) => a.group === "Defense").length,
-      2,
+    // The whole set still sums to what the original six summed to, which is
+    // the invariant every overall depends on.
+    assert.ok(
+      Math.abs(
+        SPORTS.basketball.attributes.reduce((n, a) => n + a.weight, 0) - 6.7,
+      ) < 1e-9,
     );
   });
 

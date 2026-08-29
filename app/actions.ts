@@ -4,7 +4,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { assertCanEdit, canEdit, editingIsGated } from "@/lib/edit-auth";
 import { getDb } from "@/db";
-import { comparisons, players, profiles, runs } from "@/db/schema";
+import { comparisons, ticks, players, profiles, runs } from "@/db/schema";
 import {
   RATING_MAX,
   RATING_MIN,
@@ -210,7 +210,19 @@ export type CompareBootstrap = {
  * One axis's slice of a unified round: the pool as that axis sees it, plus what
  * this rater has already answered on it.
  */
-export type AxisBootstrap = CompareBootstrap & { axis: string };
+export type AxisBootstrap = CompareBootstrap & {
+  axis: string;
+  /**
+   * For a tick axis: the subjects this rater already ticked.
+   *
+   * Present and possibly empty once the pass has been submitted, `undefined`
+   * when it has not. That distinction is the whole reason `ticks` stores a row
+   * per subject rather than a row per tick — "went through it and ticked
+   * nobody" has to be tellable from "never opened it", because the first is
+   * evidence an attribute is a constant.
+   */
+  ticked?: string[];
+};
 
 /**
  * Everything a multi-axis session needs, in one round trip.
@@ -223,14 +235,101 @@ export type AxisBootstrap = CompareBootstrap & { axis: string };
 export async function getRoundBootstrap(
   sport: SportId,
   raterId: string,
-  axes: string[],
+  axes: { key: string; mode?: "comparative" | "tick" }[],
 ): Promise<AxisBootstrap[]> {
   return Promise.all(
-    axes.map(async (axis) => ({
-      axis,
-      ...(await getCompareBootstrap(sport, raterId, axis)),
-    })),
+    axes.map(async (axis) => {
+      const base = await getCompareBootstrap(sport, raterId, axis.key);
+      if (axis.mode !== "tick") return { axis: axis.key, ...base };
+      /*
+       * A tick block resumes as "submitted or not", not as a set of answered
+       * pairs. `answered` carries a single sentinel so the round's existing
+       * progress arithmetic — count against a per-block target — works
+       * unchanged, with the tick block's target being one pass.
+       */
+      const ticked = await getTickState(sport, raterId, axis.key);
+      return {
+        axis: axis.key,
+        ...base,
+        ticked: ticked ?? undefined,
+        answered: ticked ? ["tick"] : [],
+      };
+    }),
   );
+}
+
+/**
+ * What this rater said on one tick axis, or null if they have not answered it.
+ *
+ * Returns the ticked subjects only; the unticked ones are stored too (that is
+ * how "answered, ticked nobody" stays distinguishable from "unanswered") but
+ * the client only needs to restore the boxes that are on.
+ */
+export async function getTickState(
+  sport: string,
+  raterId: string,
+  axis: string,
+): Promise<string[] | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ subjectId: ticks.subjectId, ticked: ticks.ticked })
+    .from(ticks)
+    .where(
+      and(
+        eq(ticks.sport, sport),
+        eq(ticks.axis, axis),
+        eq(ticks.raterId, raterId),
+      ),
+    );
+  if (rows.length === 0) return null;
+  return rows.filter((r) => r.ticked === 1).map((r) => r.subjectId);
+}
+
+/**
+ * Record one whole tick pass: every subject, ticked or not.
+ *
+ * Written as one statement per subject inside a single insert so that a pass
+ * either lands complete or not at all — a half-written pass would read as a
+ * finished one with a suspiciously short list, which is exactly the failure
+ * `ticks` stores unticked rows to avoid.
+ *
+ * A rater is never a subject in their own pass. Self-assessment in a friend
+ * group is large and one-directional, and it is refused here as well as
+ * filtered in the UI because the action is a public endpoint.
+ */
+export async function submitTicks(input: {
+  sport: string;
+  axis: string;
+  raterId: string;
+  sessionId: string;
+  /** Every subject shown, with whether the rater ticked them. */
+  subjects: { id: string; ticked: boolean }[];
+}) {
+  if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
+  const axis = SPORTS[input.sport].axes.find((a) => a.key === input.axis);
+  if (!axis || axis.mode !== "tick") {
+    throw new Error(`Not a tick axis: ${input.axis}`);
+  }
+  const subjects = input.subjects.filter((s) => s.id !== input.raterId);
+  if (subjects.length === 0) throw new Error("A pass needs subjects");
+
+  const db = getDb();
+  await db
+    .insert(ticks)
+    .values(
+      subjects.map((s) => ({
+        sport: input.sport,
+        axis: input.axis,
+        raterId: input.raterId,
+        sessionId: input.sessionId,
+        subjectId: s.id,
+        ticked: s.ticked ? 1 : 0,
+      })),
+    )
+    // Re-submitting a pass keeps the first answer, matching how a re-answered
+    // comparison behaves. Changing one's mind is a re-send, not a silent
+    // overwrite of data already fitted.
+    .onConflictDoNothing();
 }
 
 export async function getCompareBootstrap(
@@ -239,7 +338,8 @@ export async function getCompareBootstrap(
   axis = "overall",
 ): Promise<CompareBootstrap> {
   const db = getDb();
-  const attribute = SPORTS[sport].axes.find((a) => a.key === axis)?.attribute;
+  const axisConfig = SPORTS[sport].axes.find((a) => a.key === axis);
+  const attribute = axisConfig?.attribute;
 
   const profileRows = await db
     .select({
@@ -256,11 +356,23 @@ export async function getCompareBootstrap(
   // An axis that names an attribute steers on that attribute. Falling back to
   // the overall when the rating is missing keeps a half-rated roster asking
   // sensible questions instead of treating everyone as identical.
-  const pool = profileRows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    estimate: attribute ? (row.ratings[attribute] ?? row.overall) : row.overall,
-  }));
+  /*
+   * A pool axis is restricted to its frozen slate.
+   *
+   * Filtered by name against the roster. An unmatched name is dropped rather
+   * than thrown on: a slate is a hand-written list in the config and a roster
+   * change should not 500 the collector for everybody. A slate that matches
+   * fewer than two people leaves the block with no pairs, and `blockTargets`
+   * caps its target to zero so the round skips it instead of stalling.
+   */
+  const slate = axisConfig?.poolNames;
+  const pool = profileRows
+    .filter((row) => !slate || slate.includes(row.name))
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      estimate: attribute ? (row.ratings[attribute] ?? row.overall) : row.overall,
+    }));
 
   if (!raterId) return { pool, answered: [], seen: {} };
 
@@ -298,7 +410,8 @@ export async function submitComparison(input: {
   winnerId: string | null;
 }) {
   if (!isSportId(input.sport)) throw new Error(`Unknown sport: ${input.sport}`);
-  if (input.leftId === input.rightId) throw new Error("A pair needs two people");
+  if (input.leftId === input.rightId)
+    throw new Error("A pair needs two people");
 
   // A rater judging themselves is the one comparison guaranteed to be biased,
   // so it is refused here as well as filtered in the picker - the action is a

@@ -26,8 +26,10 @@ export type Attribute = {
  * ones, and `throwing` is a special case: it is not correlated with anything
  * because it contains no information at all yet.
  *
- * Send one axis at a time. Asking for two passes up front is how you get
- * neither.
+ * One link per round, not per axis. A send used to be a single question, and
+ * the rule then was "send one axis at a time". A round now walks every axis
+ * flagged `collect` as sequential blocks behind one link, because three links
+ * asked in order is how a round gets half-finished (context.md 6h).
  */
 export type CompareAxis = {
   key: string;
@@ -62,6 +64,62 @@ export type CompareAxis = {
    * their meaning and it can be re-opened later.
    */
   collect?: boolean;
+  /**
+   * How this axis is collected.
+   *
+   * `comparative` (the default) is the pairwise question the collector was
+   * built for: two names, one winner, fitted by Bradley-Terry into a full
+   * 65-99 ordering. It costs ~30 questions because a stable fit needs each
+   * player to appear ~21 times.
+   *
+   * `tick` is one pass over the whole roster - "tick everyone who actually
+   * posts up" - answered in about twenty seconds. It yields membership, not a
+   * ranking, and it is the right shape when most of the roster genuinely does
+   * not do the thing. See context.md 6j for the sparsity rule that decides
+   * which an attribute gets.
+   *
+   * A tick block never enters `blockTargets`: its cost is one pass, not a
+   * share of SESSION_TARGET.
+   */
+  mode?: "comparative" | "tick";
+  /**
+   * How many questions this block asks, overriding the shared session budget.
+   *
+   * `SESSION_TARGET` divided by the number of comparative axes was fine while
+   * a round was three blocks. It stops working the moment a round can grow:
+   * adding two axes silently drops every block from 27 questions to 16, which
+   * both thins the new data and rewrites what "complete" meant for people who
+   * already finished. Naming the depth per axis makes a round extensible —
+   * existing blocks keep the target they were answered against, and a new
+   * attribute asks for what it actually needs.
+   *
+   * ~25-30 is the working range: at six raters and seventeen players a block
+   * of 25 gives each player ~17.6 appearances, comfortably above the <8 the
+   * fit flags as thin.
+   */
+  target?: number;
+  /**
+   * Restrict this block to a named slate of players.
+   *
+   * Frozen from a tick pass rather than computed per rater. One person ran the
+   * four tick passes and identified who actually does each thing, which makes
+   * every rater rank **the same** people — dense pair coverage, every pair
+   * judged by everybody, which is what Bradley-Terry wants. Per-rater pools
+   * would have splintered into slightly different slates and thinned the
+   * overlap.
+   *
+   * A one-person tick is a single-rater input, which is normally the thing
+   * `/compare` exists to remove. The exposure is small because a tick is a
+   * FACT, not a rating - the same class of input as `height_inches`. All of
+   * the ranking, which is where the bias actually lived, still comes from the
+   * group.
+   *
+   * Names, not ids, so the slate is readable and reviewable in this file.
+   * Resolved against the roster server-side; a name that matches nobody is
+   * dropped rather than throwing, because a roster change should not 500 the
+   * collector.
+   */
+  poolNames?: string[];
   /**
    * The attribute a fit on this axis estimates.
    *
@@ -164,26 +222,170 @@ export const SPORTS: Record<SportId, SportConfig> = {
         prompt: "Which one is the better player?",
         question: "Pick who you'd rather have on your team.",
       },
-      // Defense, and not shooting, because of what correlates with what.
-      // Shooting, finishing and playmaking sit at 0.88-0.94 with each other and
-      // carry ~48% of the weight: they are "can he play offence" measured three
-      // times, so a shooting pass would largely re-collect the overall pass
-      // already done. Defense is the most independent attribute after
-      // rebounding (0.43 average correlation), which makes it the one axis that
-      // can actually disagree with the overall.
-      //
-      // It is also the attribute most likely to be wrong. The stored ratings
-      // note Bang's floored 65 as a known soft spot, and one-way players are
-      // exactly where a single rater's read is hardest to check.
-      // The three axes of the current round. `collect: true` is what the
-      // unified link walks; "overall" is deliberately absent from it, because
-      // that pass is settled (§0) and re-asking it would spend the budget on a
-      // number nobody is going to change.
+      /*
+       * TICK PASSES — collected 2026-08-29, by one person, and now CLOSED.
+       *
+       * Kept in the config rather than deleted: `collect: false` is how an
+       * axis retires, so its rows keep their meaning and it can be reopened if
+       * the roster changes. The slates they produced are frozen into the
+       * `poolNames` of the ranking blocks below.
+       *
+       * What they bought, beyond the slates: `three_point` came back ticked
+       * for 15 of 16, which is the sparsity rule (context.md 6j) rejecting it
+       * as a pool attribute. It is a full-roster comparative below instead of
+       * a 105-pair round-robin. Catching that cost one twenty-second pass.
+       */
+      {
+        key: "post_control",
+        label: "Post Control (tick)",
+        attribute: "post_control",
+        mode: "tick",
+        heading: "Who actually posts up?",
+        prompt: "Tick everyone who posts up.",
+        question:
+          "Tick everyone who works from the block - turnarounds, fades, backing people down. Leave the rest.",
+      },
+      {
+        key: "block",
+        label: "Block (tick)",
+        attribute: "block",
+        mode: "tick",
+        heading: "Who blocks shots?",
+        prompt: "Tick everyone who blocks shots.",
+        question:
+          "Tick everyone who genuinely blocks shots at the rim - not just contests them.",
+      },
+      {
+        key: "steal",
+        label: "Steal (tick)",
+        attribute: "steal",
+        mode: "tick",
+        heading: "Who gets steals?",
+        prompt: "Tick everyone who gets steals.",
+        question:
+          "Tick everyone who picks off passes and digs the ball out of people's hands.",
+      },
+      {
+        key: "three_point",
+        label: "Three Point (tick)",
+        attribute: "three_point",
+        mode: "tick",
+        heading: "Who shoots threes?",
+        prompt: "Tick everyone who shoots threes.",
+        question:
+          "Tick everyone who can genuinely hit a three in a game - not in warmups.",
+      },
+
+      /*
+       * THE ROUND — nine comparative blocks behind one link.
+       *
+       * Ordered so that an abandoned tail costs the least. The pool rankings
+       * come first: they are the shortest blocks and carry the most novel
+       * information, because nothing in the app measures them yet. The three
+       * in-flight axes follow (two raters have already finished them, so they
+       * cost those two nothing). Ball handle and offensive rebound go last, as
+       * the two most redundant with what is already collected.
+       *
+       * Every block names its own `target`. Sharing SESSION_TARGET stopped
+       * working once the round could grow — adding two axes to a three-axis
+       * round silently drops every block from 27 questions to 16.
+       */
+      {
+        key: "post_control_rank",
+        label: "Post Control",
+        attribute: "post_control",
+        collect: true,
+        target: 15,
+        poolNames: [
+          "Alfonso",
+          "Bang",
+          "Brendan",
+          "Jason",
+          "Kylan",
+          "Lucas",
+          "Orion",
+          "Sean",
+          "Victor",
+        ],
+        heading: "Who's better in the post?",
+        prompt: "Which one is better in the post?",
+        question:
+          "Both of these work from the block. Pick who you'd rather have backing someone down.",
+      },
+      {
+        key: "block_rank",
+        label: "Shot Blocking",
+        attribute: "block",
+        collect: true,
+        target: 6,
+        poolNames: ["Jason", "Joe", "Kylan", "Taha"],
+        heading: "Who's the better shot blocker?",
+        prompt: "Which one is the better shot blocker?",
+        question:
+          "Both of these block shots. Pick who you'd rather have protecting the rim.",
+      },
+      {
+        key: "steal_rank",
+        label: "Steals",
+        attribute: "steal",
+        collect: true,
+        target: 15,
+        poolNames: [
+          "Bang",
+          "Brendan",
+          "Brian",
+          "David",
+          "Eric",
+          "Kylan",
+          "Orion",
+          "Taha",
+          "Victor",
+        ],
+        heading: "Who gets more steals?",
+        prompt: "Which one gets more steals?",
+        question:
+          "Both of these pick off passes. Pick who takes the ball away more often.",
+      },
+      {
+        key: "three_point_rank",
+        label: "Three Point",
+        attribute: "three_point",
+        collect: true,
+        target: 25,
+        // Fifteen of sixteen were ticked, so this is not a pool - it is very
+        // nearly the roster. The two who were not ticked are left out rather
+        // than asked about, which is the only work the tick did here.
+        poolNames: [
+          "Alfonso",
+          "Bang",
+          "Brendan",
+          "Brian",
+          "Danny",
+          "David",
+          "Eric",
+          "Jason",
+          "Joe",
+          "Justin",
+          "Lucas",
+          "Orion",
+          "Rayan",
+          "Taha",
+          "Victor",
+        ],
+        heading: "Who's the better three-point shooter?",
+        prompt: "Which one is the better three-point shooter?",
+        question: "Both of these shoot threes. Pick who you'd rather have taking one.",
+      },
+
+      // The three in-flight axes. Their targets are stated explicitly at the
+      // values they were already answered against - 27/27/26 - so that the two
+      // raters who finished them stay finished.
       {
         key: "stamina",
         label: "Stamina",
         attribute: "stamina",
         collect: true,
+        target: 27,
         heading: "Who has better stamina?",
         prompt: "Which one has better stamina?",
         question:
@@ -194,6 +396,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
         label: "Strength",
         attribute: "strength",
         collect: true,
+        target: 27,
         heading: "Who is stronger?",
         prompt: "Which one is stronger?",
         question:
@@ -204,10 +407,38 @@ export const SPORTS: Record<SportId, SportConfig> = {
         label: "Interior D",
         attribute: "interior_d",
         collect: true,
+        target: 26,
         heading: "Who's the better interior defender?",
         prompt: "Which one is the better interior defender?",
         question:
           "Pick who you'd rather have guarding the paint and protecting the rim.",
+      },
+
+      // Last, because they are the most redundant with what is already
+      // collected. Offensive rebounding is the stronger of the two:
+      // rebounding is the most independent number in the set (0.43), while
+      // ball handle sits inside the 0.88-0.94 offensive blob.
+      {
+        key: "off_reb",
+        label: "Offensive Reb",
+        attribute: "off_reb",
+        collect: true,
+        target: 25,
+        heading: "Who's the better offensive rebounder?",
+        prompt: "Which one is the better offensive rebounder?",
+        question:
+          "Pick who you'd rather have crashing the glass for a second chance.",
+      },
+      {
+        key: "ball_handle",
+        label: "Ball Handle",
+        attribute: "ball_handle",
+        collect: true,
+        target: 25,
+        heading: "Who's the better ball handler?",
+        prompt: "Which one is the better ball handler?",
+        question:
+          "Pick who you'd rather have bringing it up against pressure.",
       },
     ],
     /*
@@ -233,11 +464,12 @@ export const SPORTS: Record<SportId, SportConfig> = {
      * full* weight, which multiplies the category's influence by N.
      */
     attributes: [
-      // Weighted for full-court games to 11: you run the whole floor, boards
-      // start breaks, and the man who can still go at 9-9 decides it.
-      //
-      // The athleticism family. 1.25 was the heaviest weight in the sport and
-      // stamina is what it was really about — "the man still going at 9-9".
+      // The Physicals family. 1.25 was the heaviest weight in the sport and
+      // stamina is what it was really about - "the man still going at 9-9".
+      // Acceleration and vertical were proposed and cut: acceleration is the
+      // "Driving Dunk vs Standing Dunk" case (nobody here holds a considered
+      // view separating it from speed), and vertical dies the same death
+      // dunking did, on a group that does not play above the rim.
       {
         key: "speed",
         label: "Speed",
@@ -248,7 +480,7 @@ export const SPORTS: Record<SportId, SportConfig> = {
       {
         key: "strength",
         label: "Strength",
-        hint: "Holding position, boxing out, finishing through contact",
+        hint: "Holding position in the post, absorbing contact, not getting moved",
         weight: 1.25 / 3,
         group: "Physicals",
       },
@@ -259,48 +491,109 @@ export const SPORTS: Record<SportId, SportConfig> = {
         weight: 1.25 / 3,
         group: "Physicals",
       },
+      // The Finishing family. In a group with nobody finishing above the rim,
+      // the two ways anyone scores inside are attacking the rim and working
+      // from the block, and those come apart on real people. "Close shot" was
+      // proposed as a third and cut: it was measuring the driving layup twice.
       {
-        key: "finishing",
-        label: "Finishing",
-        hint: "Layups, contact, scoring inside and in transition",
-        weight: 1.15,
+        key: "driving_layup",
+        label: "Driving Layup",
+        hint: "Attacking the rim off the dribble, finishing in traffic",
+        weight: 1.15 / 2,
         group: "Finishing",
       },
       {
-        key: "rebounding",
-        label: "Rebounding",
-        hint: "Boxing out, second chances, starting the break",
-        weight: 1.15,
+        key: "post_control",
+        label: "Post Control",
+        hint: "Working from the block - turnarounds, fades, backing down",
+        weight: 1.15 / 2,
+        group: "Finishing",
+      },
+      // The Rebounding family. Rebounding was the most independent number in
+      // the six (0.43 average correlation), which is why it was left whole in
+      // the first split. It is split now for badges, and kept as its OWN
+      // family rather than folded in with Defense - averaging offensive and
+      // defensive boards into a six-child defensive blob would dilute the one
+      // number that carries its own information.
+      {
+        key: "def_reb",
+        label: "Defensive Reb",
+        hint: "Boxing out, clearing the defensive glass, starting the break",
+        weight: 1.15 / 2,
         group: "Rebounding",
       },
-      // The defense family. Guarding Eric and guarding Jason are not the same
+      {
+        key: "off_reb",
+        label: "Offensive Reb",
+        hint: "Crashing the offensive glass, second chances, tip-ins",
+        weight: 1.15 / 2,
+        group: "Rebounding",
+      },
+      // The Defense family. Guarding Eric and guarding Jason are not the same
       // job, and the stored height already informs which one someone does.
+      // Steal and block join as the two defensive events a pickup group
+      // actually notices happening.
       {
         key: "perimeter_d",
         label: "Perimeter D",
         hint: "Staying in front on the ball, fighting over screens",
-        weight: 1.1 / 2,
+        weight: 1.1 / 4,
         group: "Defense",
       },
       {
         key: "interior_d",
         label: "Interior D",
         hint: "Protecting the rim, help defense, guarding size",
-        weight: 1.1 / 2,
+        weight: 1.1 / 4,
         group: "Defense",
       },
       {
-        key: "shooting",
-        label: "Shooting",
-        hint: "Catch-and-shoot, range, free throws",
-        weight: 1.05,
+        key: "steal",
+        label: "Steal",
+        hint: "Reading passing lanes, digging at the ball, forcing turnovers",
+        weight: 1.1 / 4,
+        group: "Defense",
+      },
+      {
+        key: "block",
+        label: "Block",
+        hint: "Contesting at the rim, timing shots, erasing layups",
+        weight: 1.1 / 4,
+        group: "Defense",
+      },
+      // The Shooting family. These two sit inside the 0.88-0.94 offensive
+      // blob and splitting them was expected to produce two correlated
+      // numbers rather than two independent ones; the split is here for the
+      // badge list, not because it buys information.
+      {
+        key: "mid_range",
+        label: "Mid Range",
+        hint: "Pull-ups and spot shots from inside the arc",
+        weight: 1.05 / 2,
         group: "Shooting",
       },
       {
-        key: "playmaking",
-        label: "Playmaking",
-        hint: "Handles, passing, pushing it in transition",
-        weight: 1.0,
+        key: "three_point",
+        label: "Three Point",
+        hint: "Range out to the line, catch-and-shoot from deep",
+        weight: 1.05 / 2,
+        group: "Shooting",
+      },
+      // The Playmaking family. "Speed with ball" was proposed as a third and
+      // cut by the sparsity rule: everybody dribbles, so a tick pass on it
+      // returns seventeen ticks and no information.
+      {
+        key: "pass_accuracy",
+        label: "Pass Accuracy",
+        hint: "Finding the open man, hitting the right read on time",
+        weight: 1.0 / 2,
+        group: "Playmaking",
+      },
+      {
+        key: "ball_handle",
+        label: "Ball Handle",
+        hint: "Handling pressure, creating off the dribble, protecting it",
+        weight: 1.0 / 2,
         group: "Playmaking",
       },
     ],
@@ -406,11 +699,32 @@ export const SPORTS: Record<SportId, SportConfig> = {
     // Four receivers and a quarterback. The QB spot names no position: it goes
     // to whoever on the side throws best, which is how the side would pick.
     spots: [
-      { key: "wr_l", label: "WR", full: "Wide left", x: 30, y: 17, position: "wr" },
-      { key: "wr_r", label: "WR", full: "Wide right", x: 70, y: 17, position: "wr" },
+      {
+        key: "wr_l",
+        label: "WR",
+        full: "Wide left",
+        x: 30,
+        y: 17,
+        position: "wr",
+      },
+      {
+        key: "wr_r",
+        label: "WR",
+        full: "Wide right",
+        x: 70,
+        y: 17,
+        position: "wr",
+      },
       { key: "te", label: "TE", full: "Tight end", x: 23, y: 53 },
       { key: "slot", label: "SLOT", full: "Slot", x: 77, y: 53 },
-      { key: "qb", label: "QB", full: "Quarterback", x: 50, y: 80, byAttribute: "throwing" },
+      {
+        key: "qb",
+        label: "QB",
+        full: "Quarterback",
+        x: 50,
+        y: 80,
+        byAttribute: "throwing",
+      },
     ],
     sizeOrder: ["te", "wr_l", "wr_r", "slot"],
   },
