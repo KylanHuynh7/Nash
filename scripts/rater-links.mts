@@ -35,7 +35,7 @@
 import { asc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { players, profiles } from "../db/schema";
-import { SESSION_TARGET } from "../lib/compare";
+import { blockTargets } from "../lib/compare";
 import { newRaterToken, raterPath } from "../lib/rater-token";
 import { SPORTS, isSportId } from "../lib/sports";
 
@@ -177,11 +177,28 @@ const width = Math.max(...wanted.map((r) => r.name.length));
 console.log(
   `${SPORTS[sport].label} — ${wanted.length} link(s). Send one each.\n`,
 );
+/*
+ * The round's size is computed, never SESSION_TARGET. That constant is only the
+ * budget shared by axes that do not state their own target, and most of them
+ * now do — so it read "80 questions" on a round that is 188. A number under a
+ * link is a promise about how long this takes, and understating it by half is
+ * how a link gets opened once and abandoned.
+ */
+const targets = blockTargets(round, roster.length);
+const total = targets.reduce((sum, n) => sum + n, 0);
+const labelWidth = Math.max(...round.map((a) => a.label.length));
+
 console.log(
-  `  ${SESSION_TARGET} questions, in ${round.length} part(s), on one link:`,
+  `  ${total} questions, in ${round.length} part(s), on one link:`,
 );
 for (const [i, a] of round.entries()) {
-  console.log(`    ${i + 1}. ${a.label.padEnd(12)} "${a.question}"`);
+  const size =
+    (a.mode ?? "comparative") === "tick"
+      ? "checklist"
+      : `${targets[i]}`.padStart(3);
+  console.log(
+    `    ${i + 1}. ${size}  ${a.label.padEnd(labelWidth)}  "${a.question}"`,
+  );
 }
 console.log();
 for (const person of wanted) {
