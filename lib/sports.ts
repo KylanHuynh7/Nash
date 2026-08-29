@@ -226,19 +226,19 @@ export const SPORTS: Record<SportId, SportConfig> = {
         heading: "Who's better?",
         question: "Pick who you'd rather have on your team.",
       },
-      // The one axis in the app that is filling a hole rather than checking a
-      // number. Every football player carries throwing = 75 — a flat value
-      // invented because no basketball skill implies an arm — and it is load
-      // bearing: it decides who lines up at quarterback and the balancer scores
-      // it on each side's best rather than its average. So it steers the teams
-      // while containing no information whatsoever.
-      {
-        key: "throwing",
-        label: "Throwing",
-        attribute: "throwing",
-        heading: "Who's got the arm?",
-        question: "Pick who you'd rather have throwing the ball.",
-      },
+      // No throwing axis, deliberately.
+      //
+      // `throwing` is still the emptiest number in the app — flat 75 for all
+      // twelve, and load bearing, since it picks the quarterback and the
+      // balancer scores it on each side's best. On the merits it is the most
+      // collectable thing here.
+      //
+      // It is not collected because football is parked. Every send spends the
+      // same scarce thing — a friend's willingness to answer sixty questions —
+      // and that is being spent on basketball until basketball is finished.
+      // Football has also never had its own overall pass, so a throwing pass
+      // would have been the second question asked of a sport nobody has
+      // answered a first one about.
     ],
     // Nobody is designated. A side can ride whoever has the hot hand, and does.
     decisiveAttribute: "throwing",

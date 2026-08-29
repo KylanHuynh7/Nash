@@ -212,13 +212,25 @@ describe("sport config", () => {
     }
   });
 
-  it("football collects throwing, the one attribute carrying no information", () => {
-    // It is flat 75 for everyone, it decides who plays quarterback, and the
-    // balancer scores it on each side's best. Load-bearing and empty.
-    const axis = SPORTS.football.axes.find((a) => a.key === "throwing");
-    assert.ok(axis, "football no longer collects throwing");
-    assert.equal(axis.attribute, "throwing");
+  it("football collects nothing beyond the overall while it is parked", () => {
+    /*
+     * `throwing` is the most collectable number in the app on the merits —
+     * flat 75 for all twelve, and load bearing, since it picks the quarterback
+     * and the balancer scores it on each side's best. It is still not
+     * collected, because football is parked behind basketball and every send
+     * spends the same scarce thing: a friend's willingness to answer sixty
+     * questions.
+     *
+     * The attribute stays. The QB spot is filled from it and the balancer
+     * names it as decisive, so removing it would be a different change
+     * entirely.
+     */
+    assert.deepEqual(SPORTS.football.axes.map((a) => a.key), ["overall"]);
     assert.equal(SPORTS.football.decisiveAttribute, "throwing");
+    assert.ok(
+      SPORTS.football.attributes.some((a) => a.key === "throwing"),
+      "the QB spot is filled from throwing; the attribute has to stay",
+    );
   });
 
   it("basketball's second axis is defense, not an offensive one", () => {
