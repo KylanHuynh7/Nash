@@ -668,45 +668,123 @@ export const SPORTS: Record<SportId, SportConfig> = {
     ],
     // Nobody is designated. A side can ride whoever has the hot hand, and does.
     decisiveAttribute: "throwing",
+    /*
+     * Twelve attributes, for the game this group actually plays: 5-a-side,
+     * pass only, a rusher released on a count, two-hand touch, and no subs -
+     * everyone plays both ways, so defence is half of what a player is worth.
+     *
+     * The format decides the list. There is no run game, so carrying and
+     * trucking are not attributes here. There is a rush, so getting home in
+     * four seconds is one. It is two-hand touch, so beating the first man
+     * after the catch is a real skill rather than a formality.
+     *
+     * Weighted after the group's own reading that its best player is 5'5" and
+     * wins on cutting: separation and short-area quickness decide these games,
+     * and size does not. Contested Catch is deliberately light for that reason.
+     */
     attributes: [
-      {
-        key: "hands",
-        label: "Hands",
-        hint: "Catching in traffic, contested grabs, drops",
-        weight: 1.15,
-      },
+      // Physicals. Speed and Quickness are separate because the best player in
+      // the group is the case that splits them - at 5'5" he is not the fastest
+      // man in a straight line, but nobody taller can decelerate and turn with
+      // him.
       {
         key: "speed",
         label: "Speed",
-        hint: "Straight-line burst, running past people",
+        hint: "Straight-line burst, running past someone deep",
         weight: 1.1,
+        group: "Physicals",
       },
       {
-        key: "coverage",
-        label: "Coverage",
-        hint: "Man defense, jumping routes, picks",
-        weight: 1.1,
+        key: "quickness",
+        label: "Quickness",
+        hint: "First step, sharp cuts, changing direction",
+        weight: 1.2,
+        group: "Physicals",
       },
       {
-        key: "routes",
-        label: "Routes",
-        hint: "Shiftiness, cuts, getting open short",
-        weight: 1.05,
-      },
-      {
-        key: "iq",
-        label: "Football IQ",
-        hint: "Spacing, reads, scrambling with the QB",
+        key: "stamina",
+        label: "Stamina",
+        hint: "Both ways with no subs - still going late",
         weight: 0.9,
+        group: "Physicals",
       },
-      // Only one player throws per possession, so a low weight here keeps a
-      // pocket-passer from being over-rated as an all-around player. Teams get
-      // a thrower via the QB position spread instead.
+      // Receiving. Every snap is a pass, so Hands is one of the two heaviest
+      // numbers in the sport.
+      {
+        key: "hands",
+        label: "Hands",
+        hint: "Catching the ones he should - drops",
+        weight: 1.2,
+        group: "Receiving",
+      },
+      {
+        key: "contested_catch",
+        label: "Contested Catch",
+        hint: "In traffic, over a defender, jump balls",
+        weight: 0.85,
+        group: "Receiving",
+      },
+      {
+        key: "yac",
+        label: "After the Catch",
+        hint: "Making the first man miss - real at two-hand touch",
+        weight: 1.05,
+        group: "Receiving",
+      },
+      {
+        key: "short_routes",
+        label: "Short Routes",
+        hint: "Slants, outs, getting open now",
+        weight: 1.15,
+        group: "Routes",
+      },
+      {
+        key: "deep_routes",
+        label: "Deep Routes",
+        hint: "Getting behind someone and tracking the ball",
+        weight: 0.95,
+        group: "Routes",
+      },
+      // Coverage. The other heaviest number: five defenders, and every play is
+      // a pass.
+      {
+        key: "man_coverage",
+        label: "Man Coverage",
+        hint: "Staying with their best receiver",
+        weight: 1.2,
+        group: "Coverage",
+      },
+      {
+        key: "zone_awareness",
+        label: "Zone Awareness",
+        hint: "Reading the QB, jumping routes, picks",
+        weight: 1.05,
+        group: "Coverage",
+      },
+      {
+        key: "pass_rush",
+        label: "Pass Rush",
+        hint: "Getting home once the count is up",
+        weight: 0.85,
+        group: "Coverage",
+      },
+      /*
+       * Kept as ONE number rather than split into power and accuracy. It was
+       * flat 75 for everybody before this pass, and splitting an empty number
+       * gets you two empty numbers.
+       *
+       * Light on purpose: only one person throws per possession, so weighting
+       * it heavily would rate a thrower as an all-around player. A side gets
+       * its thrower from the QB spot, which is filled by this attribute, and
+       * the balancer separately evens out each side's BEST thrower - see
+       * `decisiveAttribute`. Weighting it here as well would count it twice.
+       */
       {
         key: "throwing",
         label: "Throwing",
-        hint: "Arm strength and accuracy \u2014 QBs only",
+        hint: "Arm and accuracy - only five can really do it",
         weight: 0.7,
+        group: "Quarterback",
       },
     ],
     // Quarterback is deliberately absent. This group plays it as a role the
