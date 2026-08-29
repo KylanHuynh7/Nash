@@ -202,6 +202,25 @@ describe("sport config", () => {
         assert.ok(axis.question.length > 0, `${axis.key} asks nothing`);
         assert.ok(axis.label.length > 0, `${axis.key} has no label`);
         assert.ok(axis.heading.length > 0, `${axis.key} has no heading`);
+        assert.ok(axis.prompt.length > 0, `${axis.key} has no prompt`);
+        // The headline is the one line that reliably gets read, so it has to
+        // name what is being compared rather than gesture at it. A rater who
+        // skims "Who's still going?" has not been told the question.
+        // A loose stem check — three letters of the label. Loose is enough to
+        // catch the regression that matters: a flavour headline like "Who's
+        // still going?" for the stamina axis names nothing at all.
+        const names =
+          axis.key === "overall"
+            ? /player|better/i
+            : new RegExp(axis.label.slice(0, 3), "i");
+        assert.ok(
+          names.test(axis.heading),
+          `${axis.key} heading does not name what is being compared: "${axis.heading}"`,
+        );
+        assert.ok(
+          names.test(axis.prompt),
+          `${axis.key} prompt does not name what is being compared: "${axis.prompt}"`,
+        );
         if (axis.attribute) {
           // An axis pointing at an attribute that does not exist would collect
           // answers nothing could ever be fitted to.

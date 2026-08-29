@@ -34,10 +34,23 @@ export type CompareAxis = {
   /**
    * The page's headline. Written per axis rather than derived from the label,
    * because deriving it produces things like "Who's better: throwing?".
+   *
+   * **Name the attribute here.** This is the one line that reliably gets read,
+   * and a flavour headline like "Who's still going?" leaves the actual question
+   * in a paragraph nobody scans.
    */
   heading: string;
   /** Exactly what the rater is asked, in their words. */
   question: string;
+  /**
+   * The question restated immediately above the two names.
+   *
+   * The headline is at the top of the page; the decision happens 300px lower,
+   * and after the first few answers a rater is only looking at the buttons.
+   * This sits at the point of the decision, and it is what stops someone
+   * answering the strength block as though it were still the stamina one.
+   */
+  prompt: string;
   /** How the axis is named in scripts and links. */
   label: string;
   /**
@@ -147,7 +160,8 @@ export const SPORTS: Record<SportId, SportConfig> = {
       {
         key: "overall",
         label: "Overall",
-        heading: "Who's better?",
+        heading: "Who's the better player?",
+        prompt: "Which one is the better player?",
         question: "Pick who you'd rather have on your team.",
       },
       // Defense, and not shooting, because of what correlates with what.
@@ -170,16 +184,18 @@ export const SPORTS: Record<SportId, SportConfig> = {
         label: "Stamina",
         attribute: "stamina",
         collect: true,
-        heading: "Who's still going?",
+        heading: "Who has better stamina?",
+        prompt: "Which one has better stamina?",
         question:
-          "Pick who you'd rather have in the last game of the night.",
+          "Pick who you'd rather have in the last game of the night — still going at 9-9.",
       },
       {
         key: "strength",
         label: "Strength",
         attribute: "strength",
         collect: true,
-        heading: "Who's stronger?",
+        heading: "Who is stronger?",
+        prompt: "Which one is stronger?",
         question:
           "Pick who you'd rather have holding position and boxing out.",
       },
@@ -188,8 +204,10 @@ export const SPORTS: Record<SportId, SportConfig> = {
         label: "Interior D",
         attribute: "interior_d",
         collect: true,
-        heading: "Who protects the rim?",
-        question: "Pick who you'd rather have guarding the paint.",
+        heading: "Who's the better interior defender?",
+        prompt: "Which one is the better interior defender?",
+        question:
+          "Pick who you'd rather have guarding the paint and protecting the rim.",
       },
     ],
     /*
@@ -314,7 +332,8 @@ export const SPORTS: Record<SportId, SportConfig> = {
       {
         key: "overall",
         label: "Overall",
-        heading: "Who's better?",
+        heading: "Who's the better player?",
+        prompt: "Which one is the better player?",
         question: "Pick who you'd rather have on your team.",
       },
       // No throwing axis, deliberately.

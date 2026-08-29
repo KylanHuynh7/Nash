@@ -2,6 +2,7 @@
  * Issues one comparison link per person and prints them for sending.
  *
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball
+ *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball --only Victor,Eric
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball --axis stamina
  *   npx dotenv -e .env.local -- npx tsx scripts/rater-links.mts basketball --base http://192.168.12.176:3000
  *
@@ -45,6 +46,15 @@ const sport = args[0];
 const base = (valueOf("--base") ?? DEFAULT_BASE).replace(/\/+$/, "");
 const rotate = valueOf("--rotate");
 const axisKey = valueOf("--axis");
+/*
+ * Who to print. A round does not have to go to the whole roster — the useful
+ * raters are the ones who actually answer, and printing seventeen links when
+ * five are being sent is how the wrong one gets pasted into a DM.
+ */
+const only = (valueOf("--only") ?? "")
+  .split(",")
+  .map((n) => n.trim().toLowerCase())
+  .filter(Boolean);
 
 function valueOf(flag: string): string | undefined {
   const at = args.indexOf(flag);
@@ -53,7 +63,7 @@ function valueOf(flag: string): string | undefined {
 
 if (!sport || !isSportId(sport)) {
   console.error(
-    `usage: rater-links.mts <${Object.keys(SPORTS).join("|")}> [--axis KEY] [--base URL] [--rotate NAME]`,
+    `usage: rater-links.mts <${Object.keys(SPORTS).join("|")}> [--only NAME,...] [--axis KEY] [--base URL] [--rotate NAME]`,
   );
   process.exit(1);
 }
@@ -149,10 +159,23 @@ const roster = await db
   .where(eq(profiles.sport, sport))
   .orderBy(asc(players.name));
 
-const width = Math.max(...roster.map((r) => r.name.length));
+const wanted = only.length
+  ? roster.filter((r) => only.includes(r.name.toLowerCase()))
+  : roster;
+for (const name of only) {
+  if (!roster.some((r) => r.name.toLowerCase() === name)) {
+    console.error(`warning: --only "${name}" matched nobody on this roster`);
+  }
+}
+if (wanted.length === 0) {
+  console.error("Nobody to print.");
+  process.exit(1);
+}
+
+const width = Math.max(...wanted.map((r) => r.name.length));
 
 console.log(
-  `${SPORTS[sport].label} — ${roster.length} links. Send one each.\n`,
+  `${SPORTS[sport].label} — ${wanted.length} link(s). Send one each.\n`,
 );
 console.log(
   `  ${SESSION_TARGET} questions, in ${round.length} part(s), on one link:`,
@@ -161,7 +184,7 @@ for (const [i, a] of round.entries()) {
   console.log(`    ${i + 1}. ${a.label.padEnd(12)} "${a.question}"`);
 }
 console.log();
-for (const person of roster) {
+for (const person of wanted) {
   if (!person.token) continue; // Unreachable: every row was just backfilled.
   console.log(
     `  ${person.name.padEnd(width)}  ${base}${raterPath(sport, person.token, axisKey)}`,

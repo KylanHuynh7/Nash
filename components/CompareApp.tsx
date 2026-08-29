@@ -179,7 +179,13 @@ export default function CompareApp({
             blocks={axes.length}
             label={axis.label}
           />
-          <div className="mt-6 grid gap-3">
+          {/* The question, restated where the decision actually happens. The
+              headline is at the top of the page and a rater a dozen answers in
+              is only looking at the two buttons. */}
+          <p className="mt-6 text-center text-sm font-semibold text-ink">
+            {axis.prompt}
+          </p>
+          <div className="mt-3 grid gap-3">
             <Choice player={pair.left} onPick={() => answer(pair.left.id)} />
             <div className="flex items-center gap-3">
               <span className="h-px flex-1 bg-line" />
