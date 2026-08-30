@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import BadgeIcon from "@/components/BadgeIcon";
 import { Button, Rating, badgeTone, ratingBar } from "@/components/ui";
 import {
   RATING_MAX,
@@ -241,7 +242,7 @@ export default function PlayerCard({
                       </p>
                       <ul className="grid gap-1.5">
                         {held.map((badge) => (
-                          <BadgeRow key={badge.key} badge={badge} config={config} />
+                          <BadgeRow key={badge.key} badge={badge} />
                         ))}
                       </ul>
                     </div>
@@ -251,7 +252,7 @@ export default function PlayerCard({
             ) : (
               <ul className="grid gap-1.5">
                 {featured(badges).map((badge) => (
-                  <BadgeRow key={badge.key} badge={badge} config={config} />
+                  <BadgeRow key={badge.key} badge={badge} />
                 ))}
               </ul>
             )}
@@ -426,49 +427,90 @@ const BADGE_FAMILIES: ReadonlyArray<{
   { key: "combination", label: "Style", note: "several numbers at once" },
 ];
 
+/** What each family IS, shown when a badge is opened. */
+const FAMILY_NOTE: Record<Badge["family"], string> = {
+  attribute:
+    "An attribute badge: a straight cut on one number, in four tiers. Everyone who clears the bar holds it.",
+  signature:
+    "A signature: unusually lopsided toward this for his own level, measured against the whole roster. Held or not held, never tiered.",
+  combination:
+    "A style: several numbers at once. It has no tier of its own — you meet the whole rule or you do not.",
+};
+
 /**
- * One badge: its name, what it says, and what earned it.
+ * One badge: a picture, a name, and a tier — with the explanation behind a tap.
  *
- * The tier sits on the right only for the attribute family. The other two are
- * untiered on purpose (6i) — a shape is not more or less true — so they print
- * their family instead of a metal, rather than being given a rank the
- * derivation does not compute.
+ * Collapsed by default because the card is read at a glance and three blurbs
+ * stacked under three names is a wall. The blurb says what the badge feels
+ * like; `requirement` says what it actually took, which is the thing someone
+ * means when they tap a badge and ask what it does.
+ *
+ * `requirement` also replaced a separate line naming the attributes, which said
+ * "Speedster / Speed" and stuttered. Naming the attribute AND its number does
+ * that job properly.
  */
-function BadgeRow({ badge, config }: { badge: Badge; config: SportConfig }) {
-  // The attributes behind it, named. A badge is a claim about ratings that are
-  // already on this card, and saying which ones keeps it checkable instead of
-  // arriving as a verdict from nowhere.
-  const from = badge.attributes
-    .map((key) => config.attributes.find((a) => a.key === key)?.label)
-    .filter(Boolean);
-  // "Complete Player" names every attribute there is; listing twelve of them
-  // under a badge whose whole point is that there are no gaps says nothing.
-  const evidence =
-    from.length === 0 || from.length === config.attributes.length
-      ? null
-      : from.join(" · ");
+function BadgeRow({ badge }: { badge: Badge }) {
+  const [open, setOpen] = useState(false);
+  const tier = badge.tier
+    ? tierLabel(badge.tier)
+    : badge.family === "signature"
+      ? "Signature"
+      : "Style";
 
   return (
-    <li className="flex items-start justify-between gap-2 rounded-xl border border-line bg-sunken px-3 py-2">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold">{badge.name}</p>
-        <p className="text-xs leading-snug text-muted">{badge.blurb}</p>
-        {evidence && (
-          /* Not `--ink-soft`: that token is for text on the silver ground and
-             disappears on a dark card, which is what this is. Separation from
-             the blurb comes from size, not from a dimmer colour. */
-          <p className="mt-0.5 truncate text-[10px] text-muted">{evidence}</p>
-        )}
-      </div>
-      <span
-        className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeTone(badge.tier)}`}
+    /* `min-w-0` is load-bearing. A grid item defaults to `min-width: auto`,
+       which means "at least as wide as my content" — so a long requirement
+       line ("Throwing 84+ and either Hands 84+ or Short Routes 84+") sized the
+       row past the card and clipped the tier pill, with the `truncate` below
+       it powerless to help. Measured at 402px inside a 388px dialog. */
+    <li className="min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition ${
+          open
+            ? "border-accent bg-raised"
+            : "border-line bg-sunken hover:border-accent/50"
+        }`}
       >
-        {badge.tier
-          ? tierLabel(badge.tier)
-          : badge.family === "signature"
-            ? "Signature"
-            : "Style"}
-      </span>
+        <BadgeIcon badge={badge} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">
+            {badge.name}
+          </span>
+          {/* The rule stays put whether open or closed. Swapping it for the
+              blurb on open printed the blurb twice — once here and once in the
+              panel directly below it. */}
+          <span className="block truncate text-[11px] text-muted">
+            {badge.requirement}
+          </span>
+        </span>
+        <span
+          className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeTone(badge.tier)}`}
+        >
+          {tier}
+        </span>
+      </button>
+      {open && (
+        <div className="mt-1 rounded-xl border border-line bg-surface px-3 py-2.5">
+          <p className="text-xs leading-snug text-foreground">{badge.blurb}</p>
+          {/* The rule in full. Not a repeat of the row above it — a long one
+              ("Throwing 84+ and either Hands 84+ or Short Routes 84+") is
+              elided up there, and the whole point of opening a badge is to
+              find out what it actually took. */}
+          <p className="mt-1.5 text-[11px] leading-snug text-muted">
+            <span className="uppercase tracking-wide">Earned for</span>{" "}
+            <span className="text-foreground">{badge.requirement}</span>
+          </p>
+          {/* What KIND of badge this is. Without it, an untiered badge next to
+              a Hall of Fame one reads as having been graded and come up short,
+              when the two are answering different questions entirely. */}
+          <p className="mt-1.5 border-t border-line pt-1.5 text-[11px] leading-snug text-muted">
+            {FAMILY_NOTE[badge.family]}
+          </p>
+        </div>
+      )}
     </li>
   );
 }

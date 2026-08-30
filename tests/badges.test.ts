@@ -218,6 +218,44 @@ describe("combination badges", () => {
   });
 });
 
+describe("requirement and icon", () => {
+  it("states the tier actually cleared, not the bottom of the catalogue", () => {
+    const hof = flat(RATING_MIN, { speed: 97 });
+    const bronze = flat(RATING_MIN, { speed: 78 });
+    const rule = (p: { ratings: Record<string, number> }) =>
+      deriveBadges(config, p.ratings, spreadRoster()).find((b) => b.name === "Flash")
+        ?.requirement;
+    assert.equal(rule(hof), "Speed 96+");
+    assert.equal(rule(bronze), "Speed 76+");
+  });
+
+  it("states an OR branch as an alternative, not a requirement", () => {
+    // The text the card shows has to distinguish AND from OR, because the
+    // flattened attribute list could not and said the player cleared all three.
+    const p = flat(RATING_MIN, { perimeter_d: 88, three_point: 88 });
+    const badge = deriveBadges(config, p.ratings, spreadRoster()).find(
+      (b) => b.name === "Two-Way",
+    );
+    assert.ok(badge);
+    assert.equal(
+      badge.requirement,
+      "Perimeter D 84+ and either Three Point 84+ or Driving Layup 84+",
+    );
+  });
+
+  it("gives every badge an icon and a requirement", () => {
+    // A badge with neither renders a blank frame and an empty line, which is
+    // worse than not showing it at all.
+    for (const sport of Object.values(SPORTS)) {
+      const top = Object.fromEntries(sport.attributes.map((a) => [a.key, RATING_MAX]));
+      for (const badge of deriveBadges(sport, top, [{ ratings: top }])) {
+        assert.ok(badge.icon, `${sport.id}/${badge.name} has no icon`);
+        assert.ok(badge.requirement, `${sport.id}/${badge.name} has no requirement`);
+      }
+    }
+  });
+});
+
 describe("featured", () => {
   it("shows three, and never invents one", () => {
     const many = deriveBadges(config, flat(RATING_MAX).ratings, spreadRoster());

@@ -61,6 +61,20 @@ export type Badge = {
   /** Which attributes produced it — for showing the evidence behind a badge. */
   attributes: string[];
   /**
+   * The rule, in words: "Speed 96+", "Man Coverage 91+ and Quickness 84+".
+   *
+   * Derived here rather than written per badge, so it cannot drift from the
+   * threshold that actually fired. This is what someone means when they tap a
+   * badge and ask what it does — the blurb says what it feels like, this says
+   * what it took.
+   */
+  requirement: string;
+  /**
+   * Which glyph draws it. An attribute key by default, since that is what the
+   * badge is about; named explicitly where the first attribute would mislead.
+   */
+  icon: string;
+  /**
    * How far past the bar this one was earned, standardised where that means
    * something. Used only to rank which badges the card features.
    */
@@ -145,6 +159,7 @@ const BASKETBALL_COMBINATION: ReadonlyArray<{
   name: string;
   blurb: string;
   requires: Clause;
+  icon?: string;
 }> = [
   { name: "Two-Way", blurb: "guards and scores", requires: { all: [["perimeter_d", "S"]], any: [["three_point", "S"], ["driving_layup", "S"]] } },
   { name: "Glue Guy", blurb: "does the unglamorous parts", requires: { all: [["perimeter_d", "B"], ["def_reb", "B"], ["stamina", "S"]] } },
@@ -159,11 +174,11 @@ const BASKETBALL_COMBINATION: ReadonlyArray<{
   { name: "Lockdown", blurb: "takes the best guard", requires: { all: [["perimeter_d", "G"], ["speed", "S"]] } },
   { name: "Ball Hawk", blurb: "gambles and wins", requires: { all: [["steal", "G"], ["perimeter_d", "S"]] } },
   { name: "Anchor", blurb: "holds the paint", requires: { all: [["interior_d", "G"], ["def_reb", "G"]] } },
-  { name: "Stretch Big", blurb: "boards and shoots", requires: { all: [["def_reb", "S"], ["three_point", "S"]] } },
+  { name: "Stretch Big", blurb: "boards and shoots", requires: { all: [["def_reb", "S"], ["three_point", "S"]] }, icon: "three_point" },
   { name: "Engine", blurb: "pushes it all game", requires: { all: [["speed", "G"], ["pass_accuracy", "S"]] } },
   { name: "Closer", blurb: "still shooting at 9-9", requires: { all: [["three_point", "G"], ["stamina", "G"]] } },
   { name: "Immovable", blurb: "cannot be moved off a spot", requires: { all: [["strength", "G"], ["interior_d", "S"]] } },
-  { name: "Chase-Down", blurb: "blocks it from behind", requires: { all: [["speed", "G"], ["block", "S"]] } },
+  { name: "Chase-Down", blurb: "blocks it from behind", requires: { all: [["speed", "G"], ["block", "S"]] }, icon: "block" },
 ];
 
 /** Every attribute at Bronze. Stated separately because it names no attributes. */
@@ -217,18 +232,19 @@ const FOOTBALL_COMBINATION: ReadonlyArray<{
   name: string;
   blurb: string;
   requires: Clause;
+  icon?: string;
 }> = [
   { name: "Matchup Nightmare", blurb: "cannot be covered", requires: { all: [["hands","S"],["deep_routes","S"],["contested_catch","S"]] } },
   { name: "Slot Machine", blurb: "lives underneath", requires: { all: [["short_routes","G"],["quickness","S"]] } },
-  { name: "Grab-n-Go", blurb: "catch it and gone", requires: { all: [["hands","S"],["yac","G"]] } },
+  { name: "Grab-n-Go", blurb: "catch it and gone", requires: { all: [["hands","S"],["yac","G"]] }, icon: "yac" },
   { name: "Double Me", blurb: "needs two defenders", requires: { all: [["contested_catch","G"],["hands","G"]] } },
-  { name: "Go Route", blurb: "one step and it is over", requires: { all: [["speed","G"],["deep_routes","G"]] } },
+  { name: "Go Route", blurb: "one step and it is over", requires: { all: [["speed","G"],["deep_routes","G"]] }, icon: "deep_routes" },
   { name: "Two-Way", blurb: "wins on both sides of it", requires: { all: [["man_coverage","S"]], any: [["hands","S"],["short_routes","S"]] } },
   { name: "Lockdown", blurb: "takes their best", requires: { all: [["man_coverage","G"],["quickness","S"]] } },
   { name: "Ballhawk", blurb: "picks, not pass breakups", requires: { all: [["zone_awareness","G"],["man_coverage","S"]] } },
   { name: "Unstoppable Force", blurb: "the count is not long enough", requires: { all: [["pass_rush","G"],["speed","S"]] } },
   { name: "Field General", blurb: "reads it and delivers", requires: { all: [["throwing","G"],["zone_awareness","S"]] } },
-  { name: "Escape Artist", blurb: "the rush does not end the play", requires: { all: [["throwing","S"],["quickness","G"]] } },
+  { name: "Escape Artist", blurb: "the rush does not end the play", requires: { all: [["throwing","S"],["quickness","G"]] }, icon: "quickness" },
   { name: "Dual Threat", blurb: "throws it or catches it", requires: { all: [["throwing","S"]], any: [["hands","S"],["short_routes","S"]] } },
   { name: "Iron Man", blurb: "still going both ways late", requires: { all: [["stamina","G"]], any: [["man_coverage","S"],["short_routes","S"]] } },
   { name: "Possession Target", blurb: "moves the chains", requires: { all: [["hands","G"],["contested_catch","S"]] } },
@@ -272,6 +288,33 @@ const CATALOGUES: Record<string, Catalogue> = {
 /* ------------------------------------------------------------------ *
  * Derivation
  * ------------------------------------------------------------------ */
+
+/**
+ * A threshold clause in words: `["man_coverage", "G"]` -> "Man Coverage 91+".
+ *
+ * Labels come from the sport config rather than from a second table, so a
+ * renamed attribute renames itself here too.
+ */
+function describeCut(config: SportConfig, [key, cut]: string[]): string {
+  const label = config.attributes.find((a) => a.key === key)?.label ?? key;
+  return `${label} ${CUT[cut as keyof typeof CUT]}+`;
+}
+
+/**
+ * The whole rule for a combination badge.
+ *
+ * `all` clauses join with "and"; the `any` branch joins with "or" and is
+ * wrapped in "either", because the difference between the two is the thing a
+ * reader most needs and the thing the card previously got wrong.
+ */
+function describeClause(config: SportConfig, requires: Clause): string {
+  const all = (requires.all ?? []).map((c) => describeCut(config, c));
+  const any = (requires.any ?? []).map((c) => describeCut(config, c));
+  const parts = [...all];
+  if (any.length === 1) parts.push(any[0]);
+  else if (any.length > 1) parts.push(`either ${any.join(" or ")}`);
+  return parts.join(" and ");
+}
 
 export function tierFor(value: number): BadgeTier | null {
   let held: BadgeTier | null = null;
@@ -344,6 +387,9 @@ export function deriveBadges(
     if (!has.has(spec.attribute)) continue;
     const tier = tierFor(value(spec.attribute));
     if (!tier) continue;
+    const label =
+      config.attributes.find((a) => a.key === spec.attribute)?.label ??
+      spec.attribute;
     badges.push({
       key: `attr_${spec.attribute}`,
       name: spec.name,
@@ -351,6 +397,9 @@ export function deriveBadges(
       tier,
       blurb: spec.blurb,
       attributes: [spec.attribute],
+      // The bar he actually cleared, not the bottom of the catalogue.
+      requirement: `${label} ${TIERS.find((t) => t.key === tier)?.min}+`,
+      icon: spec.attribute,
       // Distance past the bar, on the band's own scale.
       score: (value(spec.attribute) - CUT.B) / (RATING_MAX - CUT.B),
     });
@@ -365,12 +414,19 @@ export function deriveBadges(
     if (!stat || stat.sd === 0) continue;
     const z = (value(spec.attribute) - overall - stat.mean) / stat.sd;
     if (z < SIGNATURE_SD) continue;
+    const label =
+      config.attributes.find((a) => a.key === spec.attribute)?.label ??
+      spec.attribute;
     badges.push({
       key: `sig_${spec.attribute}`,
       name: spec.name,
       family: "signature",
       blurb: spec.blurb,
       attributes: [spec.attribute],
+      // Relative, so the rule has to say so: an absolute number here would
+      // read as a threshold and this family does not have one.
+      requirement: `${label} ${z.toFixed(1)}sd above his own level`,
+      icon: spec.attribute,
       score: z,
     });
   }
@@ -404,6 +460,9 @@ export function deriveBadges(
       family: "combination",
       blurb: spec.blurb,
       attributes: named,
+      // The full rule, including the OR branch, stated as an alternative.
+      requirement: describeClause(config, spec.requires),
+      icon: spec.icon ?? named[0],
       // The weakest link is what the badge actually cost to earn.
       score: Math.min(...named.filter((k) => has.has(k)).map((k) => value(k))) / RATING_MAX,
     });
@@ -416,6 +475,8 @@ export function deriveBadges(
       family: "combination",
       blurb: catalogue.complete.blurb,
       attributes: config.attributes.map((a) => a.key),
+      requirement: `Every attribute ${CUT.B}+`,
+      icon: "complete",
       score: Math.min(...config.attributes.map((a) => value(a.key))) / RATING_MAX,
     });
   }
