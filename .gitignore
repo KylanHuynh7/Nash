@@ -43,3 +43,6 @@ next-env.d.ts
 *.png
 ratings.csv
 draft-sheet.csv
+
+# Session notes. Kept on disk, out of the repo - see AGENTS.md.
+context.md
