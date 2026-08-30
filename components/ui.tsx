@@ -139,3 +139,34 @@ export function EmptyState({ title, body }: { title: string; body: string }) {
     </div>
   );
 }
+
+/**
+ * Badge tiers, which are NOT the rating tiers.
+ *
+ * `ratingTone` runs green-to-red on how good a number is. A badge has already
+ * cleared its bar, so there is no bad tier to colour — the scale is rarity, and
+ * it reads as metal: bronze, silver, gold, and then something that is not a
+ * metal at all because Hall of Fame should not look like "gold, but more".
+ *
+ * Violet for that top tier rather than a brighter green: the accent is a
+ * sport's own colour and a badge is not the sport, so borrowing it would make
+ * the rarest badge look like chrome. It also keeps HoF from reading as a 90+
+ * rating badge sitting in the wrong place on the card.
+ */
+export function badgeTone(tier: string | undefined): string {
+  switch (tier) {
+    case "hof":
+      return "text-violet-200 border-violet-400/55 bg-violet-400/20";
+    case "gold":
+      return "text-yellow-200 border-yellow-400/50 bg-yellow-400/15";
+    case "silver":
+      return "text-zinc-100 border-zinc-300/45 bg-zinc-300/15";
+    case "bronze":
+      return "text-amber-200/90 border-amber-600/50 bg-amber-700/25";
+    default:
+      // Signature and combination badges are untiered on purpose (6i): a shape
+      // is not more or less true. Giving them a metal would invent a rank the
+      // derivation does not have.
+      return "text-foreground border-line-strong bg-raised";
+  }
+}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Button, Rating, ratingBar } from "@/components/ui";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Rating, badgeTone, ratingBar } from "@/components/ui";
 import {
   RATING_MAX,
   RATING_MIN,
@@ -9,6 +9,12 @@ import {
   type SportConfig,
 } from "@/lib/sports";
 import { getNbaComp, getPlayerComps, type RosterEntry } from "@/app/actions";
+import {
+  deriveBadges,
+  featured,
+  tierLabel,
+  type Badge,
+} from "@/lib/badges";
 
 type Comp = Awaited<ReturnType<typeof getPlayerComps>>[number];
 type NbaComp = Awaited<ReturnType<typeof getNbaComp>>;
@@ -118,6 +124,30 @@ export default function PlayerCard({
     return [...byName.values()].sort((a, b) => b.weight - a.weight);
   })();
 
+  /*
+   * Badges. Derived here, never stored — the rule the whole feature rests on
+   * (6i): a badge may not modify an attribute or the overall, so there is
+   * nothing to persist and the double-counting trap cannot occur.
+   *
+   * The whole roster goes in, not the players on the court, because the
+   * signature family is relative by definition: it asks whether someone is
+   * unusually lopsided toward an attribute *for his own level*, standardised
+   * across everyone. Handing it five people would quietly redefine "unusual"
+   * as "unusual among these five".
+   *
+   * Memoised on the roster identity rather than recomputed per render: the
+   * signature family needs the roster's per-attribute mean and sd, which is
+   * work proportional to the whole squad for one card.
+   */
+  const badges = useMemo(
+    () => deriveBadges(config, player.ratings, roster),
+    [config, player.ratings, roster],
+  );
+  // Thresholds decide what is EARNED; the card decides what is SHOWN (6b).
+  // The full list stays one tap away — an accomplishment should not evaporate
+  // because three others outranked it.
+  const [allBadges, setAllBadges] = useState(false);
+
   const attributes = config.attributes;
   const best = attributes.reduce((top, a) =>
     (player.ratings[a.key] ?? 0) > (player.ratings[top.key] ?? 0) ? a : top,
@@ -176,6 +206,57 @@ export default function PlayerCard({
             </p>
           </div>
         </div>
+
+        {badges.length > 0 && (
+          <section className="mt-4">
+            <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
+              <h3 className="eyebrow">Badges</h3>
+              {/* Only worth offering when there is something behind it. At
+                  three or fewer the featured list IS the full list, and a
+                  toggle that expands to the same three rows reads as broken. */}
+              {badges.length > 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setAllBadges((v) => !v)}
+                  className="text-[10px] text-muted underline-offset-2 transition hover:text-foreground hover:underline"
+                  aria-expanded={allBadges}
+                >
+                  {allBadges ? "show best three" : `all ${badges.length} badges`}
+                </button>
+              ) : (
+                <span className="text-[10px] text-muted">
+                  {badges.length} held
+                </span>
+              )}
+            </div>
+            {allBadges && badges.length > 3 ? (
+              <div className="grid gap-3">
+                {BADGE_FAMILIES.map(({ key, label, note }) => {
+                  const held = badges.filter((b) => b.family === key);
+                  if (held.length === 0) return null;
+                  return (
+                    <div key={key}>
+                      <p className="mb-1.5 text-[10px] uppercase tracking-wide text-muted">
+                        {label} · {note}
+                      </p>
+                      <ul className="grid gap-1.5">
+                        {held.map((badge) => (
+                          <BadgeRow key={badge.key} badge={badge} config={config} />
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <ul className="grid gap-1.5">
+                {featured(badges).map((badge) => (
+                  <BadgeRow key={badge.key} badge={badge} config={config} />
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         <div className="mt-4 grid gap-4">
           {families.map((family) => (
@@ -322,6 +403,73 @@ export default function PlayerCard({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * What each badge family means, in the order the card lists them.
+ *
+ * The note is not decoration. A card that shows "Speedster (Hall of Fame)"
+ * next to "Track Star" with no explanation reads as two badges of unequal
+ * rank, when they are answers to different questions — one is an absolute cut
+ * on the number, the other is being lopsided toward it for your own level.
+ * Someone can hold the second without the first, and that is the interesting
+ * case rather than a bug.
+ */
+const BADGE_FAMILIES: ReadonlyArray<{
+  key: Badge["family"];
+  label: string;
+  note: string;
+}> = [
+  { key: "attribute", label: "Attributes", note: "how high the number is" },
+  { key: "signature", label: "Signature", note: "lopsided toward it for his level" },
+  { key: "combination", label: "Style", note: "several numbers at once" },
+];
+
+/**
+ * One badge: its name, what it says, and what earned it.
+ *
+ * The tier sits on the right only for the attribute family. The other two are
+ * untiered on purpose (6i) — a shape is not more or less true — so they print
+ * their family instead of a metal, rather than being given a rank the
+ * derivation does not compute.
+ */
+function BadgeRow({ badge, config }: { badge: Badge; config: SportConfig }) {
+  // The attributes behind it, named. A badge is a claim about ratings that are
+  // already on this card, and saying which ones keeps it checkable instead of
+  // arriving as a verdict from nowhere.
+  const from = badge.attributes
+    .map((key) => config.attributes.find((a) => a.key === key)?.label)
+    .filter(Boolean);
+  // "Complete Player" names every attribute there is; listing twelve of them
+  // under a badge whose whole point is that there are no gaps says nothing.
+  const evidence =
+    from.length === 0 || from.length === config.attributes.length
+      ? null
+      : from.join(" · ");
+
+  return (
+    <li className="flex items-start justify-between gap-2 rounded-xl border border-line bg-sunken px-3 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{badge.name}</p>
+        <p className="text-xs leading-snug text-muted">{badge.blurb}</p>
+        {evidence && (
+          /* Not `--ink-soft`: that token is for text on the silver ground and
+             disappears on a dark card, which is what this is. Separation from
+             the blurb comes from size, not from a dimmer colour. */
+          <p className="mt-0.5 truncate text-[10px] text-muted">{evidence}</p>
+        )}
+      </div>
+      <span
+        className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badgeTone(badge.tier)}`}
+      >
+        {badge.tier
+          ? tierLabel(badge.tier)
+          : badge.family === "signature"
+            ? "Signature"
+            : "Style"}
+      </span>
+    </li>
   );
 }
 

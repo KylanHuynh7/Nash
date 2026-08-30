@@ -190,6 +190,24 @@ describe("combination badges", () => {
     assert.equal(holds(neither), false);
   });
 
+  it("names only the OR branch it was actually earned on", () => {
+    /*
+     * The card prints `attributes` as the evidence behind a badge, so an OR
+     * branch the player failed must not appear there — it makes an alternative
+     * read as a requirement. Caught in a browser, not by a test: Orion's
+     * Two-Way cited Man Coverage, Hands AND Short Routes when the rule asks
+     * for Man Coverage plus either of the other two.
+     */
+    const viaShooting = flat(RATING_MIN, { perimeter_d: 88, three_point: 88 });
+    const badge = deriveBadges(config, viaShooting.ratings, spreadRoster()).find(
+      (b) => b.name === "Two-Way",
+    );
+    assert.ok(badge);
+    assert.deepEqual([...badge.attributes].sort(), ["perimeter_d", "three_point"]);
+    // And the unmet branch must not drag the score it is ranked on.
+    assert.ok(badge.score > RATING_MIN / 99);
+  });
+
   it("gives Swiss Army only when nothing is below Bronze", () => {
     const clean = flat(76);
     const oneHole = flat(76, { steal: 75 });

@@ -385,7 +385,19 @@ export function deriveBadges(
     // rather than being skipped as vacuously true.
     if (!all.every(meets)) continue;
     if (any.length > 0 && !any.some(meets)) continue;
-    const named = [...all, ...any].map(([key]) => key);
+    /*
+     * The clauses actually SATISFIED, not every clause named.
+     *
+     * An OR branch the player failed did not produce the badge, and listing it
+     * makes an alternative read as a requirement — a card citing Two-Way as
+     * "Man Coverage, Hands, Short Routes" claims he cleared all three when the
+     * rule only ever asked for one of the last two. It also dragged `score`
+     * down to a number that was never a link in the chain.
+     *
+     * Every `all` clause is satisfied by the time we get here, so only the
+     * `any` branches need filtering.
+     */
+    const named = [...all, ...any.filter(meets)].map(([key]) => key);
     badges.push({
       key: `combo_${slug(spec.name)}`,
       name: spec.name,
