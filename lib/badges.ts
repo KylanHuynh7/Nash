@@ -222,7 +222,7 @@ const FOOTBALL_COMBINATION: ReadonlyArray<{
   { name: "Slot Machine", blurb: "lives underneath", requires: { all: [["short_routes","G"],["quickness","S"]] } },
   { name: "Grab-n-Go", blurb: "catch it and gone", requires: { all: [["hands","S"],["yac","G"]] } },
   { name: "Double Me", blurb: "needs two defenders", requires: { all: [["contested_catch","G"],["hands","G"]] } },
-  { name: "Take the Top Off", blurb: "one step and it is over", requires: { all: [["speed","G"],["deep_routes","G"]] } },
+  { name: "Go Route", blurb: "one step and it is over", requires: { all: [["speed","G"],["deep_routes","G"]] } },
   { name: "Two-Way", blurb: "wins on both sides of it", requires: { all: [["man_coverage","S"]], any: [["hands","S"],["short_routes","S"]] } },
   { name: "Lockdown", blurb: "takes their best", requires: { all: [["man_coverage","G"],["quickness","S"]] } },
   { name: "Ballhawk", blurb: "picks, not pass breakups", requires: { all: [["zone_awareness","G"],["man_coverage","S"]] } },
