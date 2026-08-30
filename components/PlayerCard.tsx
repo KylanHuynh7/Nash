@@ -83,14 +83,18 @@ export default function PlayerCard({
       // open, so this degrades to nothing rather than throwing.
       .catch(() => live && setComps([]));
 
-    getNbaComp(config.id, player.id)
-      .then((v) => live && setNba(v))
-      // Same trade as the comps section: a missing line beats a broken card.
-      .catch(() => live && setNba(null));
+    // Not fetched at all where the feature is off, rather than fetched and
+    // hidden — a request whose answer can never render is just latency.
+    if (config.comps) {
+      getNbaComp(config.id, player.id)
+        .then((v) => live && setNba(v))
+        // Same trade as the comps section: a missing line beats a broken card.
+        .catch(() => live && setNba(null));
+    }
     return () => {
       live = false;
     };
-  }, [config.id, player.id]);
+  }, [config.id, config.comps, player.id]);
 
   const position = config.positions.find((p) => p.key === player.position);
   const height = formatHeight(player.heightInches);
@@ -118,7 +122,10 @@ export default function PlayerCard({
     for (const attr of config.attributes) {
       const name = attr.group ?? attr.label;
       const family = byName.get(name) ?? { name, weight: 0, attributes: [] };
-      family.weight += attr.weight;
+      // An attribute priced elsewhere contributes no weight here, so its family
+      // must not claim any either — printing x0.70 beside Throwing would say it
+      // moves the overall by that much when it does not move it at all.
+      if (attr.inOverall !== false) family.weight += attr.weight;
       family.attributes.push(attr);
       byName.set(name, family);
     }
@@ -268,7 +275,14 @@ export default function PlayerCard({
               <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
                 <h3 className="eyebrow">{family.name}</h3>
                 <span className="font-mono text-[10px] tabular-nums text-muted">
-                  ×{family.weight.toFixed(2)}
+                  {family.weight > 0 ? (
+                    `×${family.weight.toFixed(2)}`
+                  ) : (
+                    /* Not in the overall, and saying so is the point: the
+                       number is real and still decides who plays the spot, it
+                       just is not taxed against everyone who cannot do it. */
+                    <span className="normal-case">not in overall</span>
+                  )}
                 </span>
               </div>
               <ul className="grid gap-2.5">
@@ -323,7 +337,7 @@ export default function PlayerCard({
           two agreeing votes, because one person's answer printed as "the
           group" is the failure this card has already had twice.
         */}
-        {nba?.comp && (
+        {config.comps && nba?.comp && (
           <section className="mt-5">
             <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
               <h3 className="eyebrow">Plays like</h3>

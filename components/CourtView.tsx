@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { teamColor } from "@/components/ui";
 import type { Matchup } from "@/lib/lineup";
 import type { BalancePlayer } from "@/lib/balance";
-import type { SportConfig } from "@/lib/sports";
+import { qbRating, type SportConfig } from "@/lib/sports";
 
 /**
  * Tap-to-swap state, threaded down to each slot.
@@ -54,7 +53,13 @@ export default function CourtView({
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{ left: `${spot.x}%`, top: `${spot.y}%` }}
             >
-              <MatchupCard matchup={m} teamCount={teamCount} swap={swap} />
+              <MatchupCard
+                matchup={m}
+                teamCount={teamCount}
+                config={config}
+                byAttribute={spot.byAttribute}
+                swap={swap}
+              />
             </div>
           );
         })}
@@ -206,25 +211,48 @@ function FieldMarkings() {
 function MatchupCard({
   matchup,
   teamCount,
+  config,
+  byAttribute,
   swap,
 }: {
   matchup: Matchup;
   teamCount: number;
+  config: SportConfig;
+  /** Set when the spot is claimed by an attribute rather than a position. */
+  byAttribute?: string;
   swap?: SwapState;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `spot-${matchup.position}`,
   });
 
+  /*
+   * What a player is worth AT THIS SPOT.
+   *
+   * Everywhere else that is his overall. At an attribute-claimed spot it is
+   * not: quarterback value was deliberately taken out of the overall, because
+   * the balancer prices it separately on each side's best arm. So a receiver's
+   * overall says nothing about how he would do under centre, and putting two
+   * of them side by side at the QB spot compared the wrong number entirely.
+   *
+   * Derived here and never stored, so a tap that puts someone at quarterback
+   * shows what it costs without making him a worse player anywhere else.
+   */
+  const rate = (p: BalancePlayer) =>
+    byAttribute
+      ? ((p.ratings ? qbRating(config, p.ratings) : null) ?? p.overall)
+      : p.overall;
+
   // Whoever is ahead owns the delta, so the sign can't be read backwards.
-  const lead = useMemo(() => {
-    const [a, b] = matchup.players;
-    if (!a || !b || teamCount !== 2) return null;
-    if (a.overall === b.overall) return { index: -1, delta: 0 };
-    return a.overall > b.overall
-      ? { index: 0, delta: a.overall - b.overall }
-      : { index: 1, delta: b.overall - a.overall };
-  }, [matchup.players, teamCount]);
+  const [a, b] = matchup.players;
+  const lead =
+    !a || !b || teamCount !== 2
+      ? null
+      : rate(a) === rate(b)
+        ? { index: -1, delta: 0 }
+        : rate(a) > rate(b)
+          ? { index: 0, delta: rate(a) - rate(b) }
+          : { index: 1, delta: rate(b) - rate(a) };
 
   return (
     <div
@@ -250,6 +278,8 @@ function MatchupCard({
             teamIndex={i}
             delta={lead && lead.index === i ? lead.delta : null}
             spot={matchup.position}
+            rate={rate}
+            atSpot={Boolean(byAttribute)}
             swap={swap}
           />
         ))}
@@ -267,12 +297,17 @@ function PlayerSlot({
   teamIndex,
   delta,
   spot,
+  rate,
+  atSpot,
   swap,
 }: {
   player: BalancePlayer | null;
   teamIndex: number;
   delta: number | null;
   spot: string;
+  rate: (p: BalancePlayer) => number;
+  /** True at an attribute-claimed spot, where the figure shown is not overall. */
+  atSpot: boolean;
   swap?: SwapState;
 }) {
   const color = teamColor(teamIndex);
@@ -332,6 +367,8 @@ function PlayerSlot({
       teamIndex={teamIndex}
       delta={delta}
       spot={spot}
+      rate={rate}
+      atSpot={atSpot}
       swap={swap}
       selected={selected}
       targetable={targetable}
@@ -345,6 +382,8 @@ function DraggablePlayer({
   teamIndex,
   delta,
   spot,
+  rate,
+  atSpot,
   swap,
   selected,
   targetable,
@@ -354,6 +393,8 @@ function DraggablePlayer({
   teamIndex: number;
   delta: number | null;
   spot: string;
+  rate: (p: BalancePlayer) => number;
+  atSpot: boolean;
   swap?: SwapState;
   selected: boolean;
   targetable: boolean;
@@ -424,8 +465,13 @@ function DraggablePlayer({
         className={`h-1.5 w-1.5 shrink-0 rounded-full ${color.dot}`}
       />
       <span className="min-w-0 flex-1 truncate font-medium">{player.name}</span>
-      <span className="font-mono tabular-nums text-muted">
-        {player.overall}
+      {/* At an attribute-claimed spot this is not his overall, so it is marked
+          rather than left to be misread as one. */}
+      <span
+        className={`font-mono tabular-nums ${atSpot ? "text-accent" : "text-muted"}`}
+        title={atSpot ? "How good he is at this spot, not his overall" : undefined}
+      >
+        {rate(player)}
       </span>
       {delta !== null && (
         <span

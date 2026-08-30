@@ -9,6 +9,7 @@ import {
   defaultRatings,
   formatHeight,
   isSportId,
+  qbRating,
 } from "@/lib/sports";
 import { basketballRows } from "./fixtures";
 
@@ -254,7 +255,7 @@ describe("sport config", () => {
     );
   });
 
-  it("basketball's round is nine comparative blocks plus the comp block", () => {
+  it("basketball's round is comparative blocks only — the comp block is scrapped", () => {
     /*
      * The round friends actually receive. Ticks are CLOSED — one person ran
      * them to identify who does what, and their slates are frozen into the
@@ -263,6 +264,11 @@ describe("sport config", () => {
      * Ordered so an abandoned tail costs least: the four pool rankings first
      * (shortest blocks, most novel data), then the three in-flight axes, then
      * the two most redundant with what is already collected.
+     *
+     * `nba_comp` was dropped on 2026-08-29. Picking one professional to stand
+     * for one person in a friend group turned out to be unanswerable: a whole
+     * round produced exactly one answer per player and not one pair reached
+     * the two-vote bar, so no verdict could ever form.
      */
     const collecting = SPORTS.basketball.axes.filter((a) => a.collect);
     assert.deepEqual(
@@ -274,16 +280,15 @@ describe("sport config", () => {
         "three_point_rank",
         "off_reb",
         "ball_handle",
-        "nba_comp",
       ],
     );
-    // No tick block is in the round any more, and exactly one comp block is.
+    // The axis stays configured so its rows keep their meaning; only the
+    // campaign flag is off.
+    assert.ok(SPORTS.basketball.axes.some((a) => a.key === "nba_comp"));
+    assert.equal(SPORTS.basketball.comps, false);
+    // Neither a tick nor a comp block is in the round any more.
     assert.ok(!collecting.some((a) => a.mode === "tick"));
-    const comps = collecting.filter((a) => a.mode === "comp");
-    assert.equal(comps.length, 1);
-    // Last, because it is the shortest and the most fun - what a rater reaches
-    // after the grind, not what distracts from it.
-    assert.equal(collecting[collecting.length - 1].mode, "comp");
+    assert.ok(!collecting.some((a) => a.mode === "comp"));
 
     const comparative = collecting.filter(
       (a) => (a.mode ?? "comparative") === "comparative",
@@ -296,15 +301,14 @@ describe("sport config", () => {
       assert.ok(a.attribute, `${a.key} collects toward no attribute`);
     }
     /*
-     * The comp block states NEITHER, and both absences are deliberate. Its
-     * depth is one question per subject, derived from the pool rather than
-     * declared; and it names no attribute because nothing is fitted from it -
-     * a comp is a label, and fit-bt must never see it.
+     * The comp axis, though no longer collected, must still name no attribute:
+     * a comp is a label and `fit-bt` must never see one. Asserted on the axis
+     * itself rather than on the round, since it is no longer in the round.
      */
-    for (const a of comps) {
-      assert.equal(a.target, undefined, `${a.key} should not state a target`);
-      assert.equal(a.attribute, undefined, `${a.key} must not name an attribute`);
-    }
+    const compAxis = SPORTS.basketball.axes.find((a) => a.mode === "comp");
+    assert.ok(compAxis);
+    assert.equal(compAxis.target, undefined, "the comp axis states a target");
+    assert.equal(compAxis.attribute, undefined, "the comp axis names an attribute");
     // The blocks two raters already finished keep the depth they answered
     // against, or those raters silently become incomplete.
     /*
@@ -423,5 +427,73 @@ describe("sport config", () => {
     assert.ok(isSportId("football"));
     assert.ok(!isSportId("hockey"));
     assert.ok(!isSportId(""));
+  });
+});
+
+describe("attributes priced elsewhere", () => {
+  const football = SPORTS.football;
+
+  it("leaves throwing out of the overall entirely, weight and all", () => {
+    /*
+     * Not merely zero-weighted: its weight has to leave the denominator too,
+     * or the other eleven attributes are diluted by a share that contributes
+     * nothing. Two players identical but for throwing must tie.
+     */
+    const base = Object.fromEntries(football.attributes.map((a) => [a.key, 80]));
+    const cannotThrow = { ...base, throwing: RATING_MIN };
+    const canThrow = { ...base, throwing: RATING_MAX };
+    assert.equal(computeOverall(football, cannotThrow), 80);
+    assert.equal(computeOverall(football, canThrow), 80);
+  });
+
+  it("still counts every attribute that is not flagged", () => {
+    const base = Object.fromEntries(football.attributes.map((a) => [a.key, 80]));
+    const worse = { ...base, hands: RATING_MIN };
+    assert.ok(computeOverall(football, worse) < 80);
+  });
+
+  it("keeps the flag off basketball, where nothing is priced elsewhere", () => {
+    for (const attr of SPORTS.basketball.attributes) {
+      assert.notEqual(attr.inOverall, false, `${attr.key} is excluded`);
+    }
+  });
+});
+
+describe("qbRating", () => {
+  const football = SPORTS.football;
+  const at = (throwing: number, zone: number) =>
+    qbRating(football, {
+      ...Object.fromEntries(football.attributes.map((a) => [a.key, 70])),
+      throwing,
+      zone_awareness: zone,
+    });
+
+  it("is dominated by the arm, three to one", () => {
+    // A strong arm with poor reads must still outrank good reads with no arm,
+    // which is how a side actually picks its quarterback.
+    assert.ok(at(95, 70)! > at(70, 95)!);
+  });
+
+  it("weighs reads rather than ignoring them", () => {
+    assert.ok(at(90, 90)! > at(90, 70)!);
+  });
+
+  it("stays inside the scale", () => {
+    assert.ok(at(RATING_MAX, RATING_MAX)! <= RATING_MAX);
+    assert.ok(at(RATING_MIN, RATING_MIN)! >= RATING_MIN);
+  });
+
+  it("returns null for a sport that names no decisive attribute", () => {
+    assert.equal(qbRating(SPORTS.basketball, defaultRatings(SPORTS.basketball)), null);
+  });
+
+  it("is not the overall — that is the whole reason it exists", () => {
+    // A receiver who cannot throw keeps his overall and loses only the spot.
+    const receiver = {
+      ...Object.fromEntries(football.attributes.map((a) => [a.key, 88])),
+      throwing: RATING_MIN,
+    };
+    assert.equal(computeOverall(football, receiver), 88);
+    assert.ok(qbRating(football, receiver)! < 88);
   });
 });

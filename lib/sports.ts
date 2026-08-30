@@ -13,6 +13,24 @@ export type Attribute = {
    * the attributes themselves, and a group carries no weight of its own.
    */
   group?: string;
+  /**
+   * Whether this attribute feeds the overall. Defaults to true.
+   *
+   * `false` is for a skill the app already prices somewhere else. Football's
+   * `throwing` is the case: `decisiveAttribute` makes the balancer score each
+   * side's BEST arm and penalise the gap, so including it in the mean as well
+   * charges for quarterback value twice — the balancer would even out overalls
+   * that already contain it, then even out the best-arm gap on top.
+   *
+   * The attribute is still real. It is rated, shown on the card, earns badges,
+   * fills the QB spot through `byAttribute`, and drives the balancer's decisive
+   * term. It simply stops taxing the eleven receivers who do not throw.
+   *
+   * A flag rather than a weight of 0 because the two say different things: a 0
+   * reads as "this matters none", and this attribute matters a great deal —
+   * just not here.
+   */
+  inOverall?: boolean;
 };
 
 /**
@@ -155,6 +173,21 @@ export type SportConfig = {
   attributes: Attribute[];
   positions: Position[];
   /**
+   * Whether the "plays like" comp feature runs for this sport.
+   *
+   * Scrapped for basketball on 2026-08-29 and the reason is worth keeping:
+   * mapping one professional onto one person in a friend group turned out to
+   * be too hard to answer. The data proved it before the argument did — after
+   * a full round, every player had exactly ONE answer and not a single pair
+   * reached the two-vote bar, so the feature could never say "the group thinks
+   * he plays like X". It was collecting singletons.
+   *
+   * Kept on for football, where the group still wants it. It needs its own
+   * list before it can run: a comp list is written against the sport people
+   * actually watch, and NBA names answer the wrong question here.
+   */
+  comps?: boolean;
+  /**
    * A position each team needs at least one of. Balancing already spreads
    * positions evenly, but this lets the UI warn when the group is short.
    */
@@ -214,6 +247,8 @@ export type SportConfig = {
 export const SPORTS: Record<SportId, SportConfig> = {
   basketball: {
     id: "basketball",
+    // Scrapped — see the flag's own note. One answer per player, no verdicts.
+    comps: false,
     label: "Basketball",
     emoji: "🏀",
     defaultTeams: 2,
@@ -460,7 +495,10 @@ export const SPORTS: Record<SportId, SportConfig> = {
         question: "Pick the NBA player each of these reminds you of.",
         prompt: "Which NBA player does he play like?",
         label: "NBA Comp",
-        collect: true,
+        // Scrapped 2026-08-29. `false` rather than deleted, which is the rule
+        // for a collected axis: the rows keep their meaning and the question
+        // could be reopened. See `comps` on SportConfig for why it stopped.
+        collect: false,
         mode: "comp",
       },
     ],
@@ -638,6 +676,8 @@ export const SPORTS: Record<SportId, SportConfig> = {
   },
   football: {
     id: "football",
+    // Wanted, and inert until a list for this sport is written.
+    comps: true,
     label: "Football",
     emoji: "\u{1F3C8}",
     defaultTeams: 2,
@@ -783,8 +823,12 @@ export const SPORTS: Record<SportId, SportConfig> = {
         key: "throwing",
         label: "Throwing",
         hint: "Arm and accuracy - only five can really do it",
+        // Kept because the QB display figure weighs it against Zone Awareness,
+        // and because a badge tier still needs a scale to sit on.
         weight: 0.7,
         group: "Quarterback",
+        // Priced by `decisiveAttribute` instead. See the flag's own note.
+        inOverall: false,
       },
     ],
     // Quarterback is deliberately absent. This group plays it as a role the
@@ -885,12 +929,49 @@ export function computeOverall(
   let total = 0;
   let weight = 0;
   for (const attr of sport.attributes) {
+    // An attribute priced elsewhere is excluded from the mean entirely — its
+    // weight leaves the denominator too, or the remaining attributes would be
+    // diluted by a share nothing contributes to.
+    if (attr.inOverall === false) continue;
     const value = ratings[attr.key] ?? RATING_DEFAULT;
     total += value * attr.weight;
     weight += attr.weight;
   }
   if (weight === 0) return RATING_DEFAULT;
   return Math.round(Math.min(RATING_MAX, Math.max(RATING_MIN, total / weight)));
+}
+
+/**
+ * How good someone would be AT QUARTERBACK, as distinct from his overall.
+ *
+ * Derived at display time and never stored — the same rule badges follow. The
+ * field view shows it at the QB spot, so putting a receiver who cannot throw
+ * under centre shows the cost right where the decision is made, without that
+ * cost following him around as a worse player everywhere else.
+ *
+ * Throwing dominates and reads carry the rest: at 5-a-side with a rusher on a
+ * count, the two things a quarterback does are put it on target and know where
+ * to go with it. Weighted 3:1 so a strong arm with poor reads still outranks
+ * good reads with no arm, which is how the group actually picks.
+ *
+ * Returns null for a sport that names no decisive attribute, so callers can
+ * simply not render it.
+ */
+export function qbRating(
+  sport: SportConfig,
+  ratings: Record<string, number>,
+): number | null {
+  const arm = sport.decisiveAttribute;
+  if (!arm) return null;
+  const throwing = ratings[arm];
+  if (typeof throwing !== "number") return null;
+  // Reads, where the sport has a name for them. Without one the arm stands
+  // alone rather than being diluted by an attribute that means something else.
+  const reads = ratings["zone_awareness"];
+  if (typeof reads !== "number") return Math.round(throwing);
+  return Math.round(
+    Math.min(RATING_MAX, Math.max(RATING_MIN, (throwing * 3 + reads) / 4)),
+  );
 }
 
 export function defaultRatings(sport: SportConfig): Record<string, number> {
