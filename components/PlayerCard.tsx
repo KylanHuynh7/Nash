@@ -10,6 +10,7 @@ import {
   type SportConfig,
 } from "@/lib/sports";
 import { getNbaComp, getPlayerComps, type RosterEntry } from "@/app/actions";
+import { authoredComp } from "@/lib/comps";
 import {
   deriveBadges,
   featured,
@@ -68,6 +69,13 @@ export default function PlayerCard({
    * deliberate act, and aggregating every player's head-to-head on every
    * roster render would be work nobody asked for.
    */
+  /*
+   * The written-down comp, if this sport has one for him. Derived, not
+   * fetched: it is a constant in the bundle, so a round trip would buy
+   * nothing but latency.
+   */
+  const picked = config.comps ? authoredComp(config.id, player.name) : null;
+
   const [comps, setComps] = useState<Comp[] | null>(null);
   const [nba, setNba] = useState<NbaComp | null>(null);
   const [against, setAgainst] = useState<RosterEntry | null>(null);
@@ -337,15 +345,51 @@ export default function PlayerCard({
           two agreeing votes, because one person's answer printed as "the
           group" is the failure this card has already had twice.
         */}
-        {config.comps && nba?.comp && (
+        {config.comps && (nba?.comp || picked) && (
           <section className="mt-5">
             <div className="mb-2 flex items-baseline justify-between gap-2 border-b border-line pb-1">
               <h3 className="eyebrow">Plays like</h3>
+              {/*
+                The two sources say different things and must not borrow each
+                other's wording. A vote count is a claim about the group; a
+                picked comp is one person's read, and saying so is the whole
+                reason it is allowed on the card at all.
+              */}
               <span className="text-[10px] text-muted">
-                {nba.votes} of {nba.answers} said so
+                {nba?.comp
+                  ? `${nba.votes} of ${nba.answers} said so`
+                  : "picked, not voted"}
               </span>
             </div>
-            <p className="text-lg font-semibold text-foreground">{nba.comp}</p>
+            {nba?.comp ? (
+              <p className="text-lg font-semibold text-foreground">{nba.comp}</p>
+            ) : (
+              /*
+                Two eras, stacked. Each row is labelled because "plays like"
+                means two different things across them — someone playing this
+                Sunday, and the archetype's canonical version — and an unlabelled
+                pair reads as a correction of the first name by the second.
+                A player with only one era renders only that row.
+              */
+              <div className="divide-y divide-line">
+                {([
+                  ["Modern", picked?.modern],
+                  ["All time", picked?.allTime],
+                ] as const).map(([era, name]) =>
+                  name ? (
+                    <div
+                      key={era}
+                      className="flex items-baseline justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
+                    >
+                      <span className="eyebrow">{era}</span>
+                      <span className="text-lg font-semibold text-foreground">
+                        {name}
+                      </span>
+                    </div>
+                  ) : null,
+                )}
+              </div>
+            )}
           </section>
         )}
 

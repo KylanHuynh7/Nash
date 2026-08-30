@@ -1,10 +1,46 @@
 /**
- * Reading the collected NBA comps.
+ * Reading comps — both kinds.
+ *
+ * A sport gets its comps one of two ways. **Collected:** the group is asked and
+ * `verdict` prints a name once two raters agree. **Authored:** one person picks
+ * them and they are written down, which is the only route that works at this
+ * roster size, where a collected round produces one answer per subject and
+ * never clears the bar. The two are never merged and never share wording — see
+ * `authoredComp`.
  *
  * Pure and server-safe. A comp is a **label, never a number** — nothing here
  * feeds a rating, an attribute or the overall, and `fit-bt.mts` must never see
  * this data.
  */
+import type { SportId } from "./sports";
+import { NFL_COMPS, type NflComp } from "./nfl";
+
+/**
+ * Sports whose comps are written down rather than voted on.
+ *
+ * A sport absent from here has no authored comps, which is not a gap: a sport
+ * can collect them instead, or not have them at all. `SportConfig.comps` is
+ * still what decides whether a card shows the section.
+ */
+const AUTHORED: Partial<Record<SportId, Record<string, NflComp>>> = {
+  football: NFL_COMPS,
+};
+
+/**
+ * The written-down comp for one player, or null where nobody picked one.
+ *
+ * **A caller must never render this with consensus wording.** It is one
+ * person's read, and this app has twice shipped one answer dressed as what the
+ * group thinks. Null is a real answer and means exactly what it says.
+ */
+export function authoredComp(sport: SportId, name: string): NflComp | null {
+  const picked = AUTHORED[sport]?.[name];
+  // An entry holding neither era is the same as no entry. Returning it would
+  // hand a caller an object that renders as an empty section.
+  if (!picked || (!picked.modern && !picked.allTime)) return null;
+  return picked;
+}
+
 export type CompVote = { subjectId: string; comp: string | null };
 
 export type CompVerdict = {
