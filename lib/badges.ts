@@ -81,7 +81,7 @@ export type Badge = {
  * mid_range against three_point is exactly the Static Middy / Limitless Range
  * distinction 2K draws off two shooting ratings.
  */
-const ATTRIBUTE_BADGES: ReadonlyArray<{
+const BASKETBALL_ATTRIBUTE: ReadonlyArray<{
   attribute: string;
   name: string;
   blurb: string;
@@ -107,7 +107,7 @@ const ATTRIBUTE_BADGES: ReadonlyArray<{
  * The one-way player's family. Untiered on purpose: a signature is a shape, and
  * a shape is not more or less true (6i).
  */
-const SIGNATURE_BADGES: ReadonlyArray<{
+const BASKETBALL_SIGNATURE: ReadonlyArray<{
   attribute: string;
   name: string;
   blurb: string;
@@ -141,7 +141,7 @@ type Clause = { all?: string[][]; any?: string[][] };
  * handles, Glass Cleaner is both boards, and Three Level is the badge the
  * shooting split bought outright.
  */
-const COMBINATION_BADGES: ReadonlyArray<{
+const BASKETBALL_COMBINATION: ReadonlyArray<{
   name: string;
   blurb: string;
   requires: Clause;
@@ -167,7 +167,107 @@ const COMBINATION_BADGES: ReadonlyArray<{
 ];
 
 /** Every attribute at Bronze. Stated separately because it names no attributes. */
-const SWISS_ARMY = { name: "Swiss Army", blurb: "no holes anywhere" };
+/* ------------------------------------------------------------------ *
+ * Football
+ *
+ * Names come from Madden's ability and X-Factor vocabulary, which is the
+ * reference this list was asked to follow. Same three families and same tiers;
+ * the attributes underneath them are the ones this format actually has.
+ * ------------------------------------------------------------------ */
+
+const FOOTBALL_ATTRIBUTE: ReadonlyArray<{
+  attribute: string;
+  name: string;
+  blurb: string;
+}> = [
+  { attribute: "speed", name: "Speedster", blurb: "runs past people" },
+  { attribute: "quickness", name: "Ankle Breaker", blurb: "cuts and he is gone" },
+  { attribute: "stamina", name: "Workhorse", blurb: "never comes off" },
+  { attribute: "hands", name: "Sure Hands", blurb: "catches what he should" },
+  { attribute: "contested_catch", name: "Reach for It", blurb: "wins it in traffic" },
+  { attribute: "yac", name: "RAC 'Em Up", blurb: "the catch is the start of it" },
+  { attribute: "short_routes", name: "Route Technician", blurb: "open in a phone booth" },
+  { attribute: "deep_routes", name: "Deep Threat", blurb: "gets behind you" },
+  { attribute: "man_coverage", name: "Shutdown", blurb: "erases his man" },
+  { attribute: "zone_awareness", name: "Zone Hawk", blurb: "reads it before it happens" },
+  { attribute: "pass_rush", name: "Edge Threat", blurb: "gets home on the count" },
+  { attribute: "throwing", name: "Gunslinger", blurb: "puts it where it needs to go" },
+];
+
+const FOOTBALL_SIGNATURE: ReadonlyArray<{
+  attribute: string;
+  name: string;
+  blurb: string;
+}> = [
+  { attribute: "speed", name: "Track Star", blurb: "faster than his level" },
+  { attribute: "quickness", name: "Shifty", blurb: "quicker than his level" },
+  { attribute: "stamina", name: "Iron Lung", blurb: "fresh when nobody else is" },
+  { attribute: "hands", name: "Glue Hands", blurb: "catches above his level" },
+  { attribute: "contested_catch", name: "Sky Ball", blurb: "wins them above his size" },
+  { attribute: "yac", name: "Slippery", blurb: "more after the catch than he should get" },
+  { attribute: "short_routes", name: "Slot-O-Matic", blurb: "always open underneath" },
+  { attribute: "deep_routes", name: "Takes the Top Off", blurb: "gets behind people above his level" },
+  { attribute: "man_coverage", name: "Blanket", blurb: "covers above his level" },
+  { attribute: "zone_awareness", name: "Lurker", blurb: "reads the throw before it goes" },
+  { attribute: "pass_rush", name: "Relentless", blurb: "rushes above his level" },
+  { attribute: "throwing", name: "Bazooka", blurb: "an arm his game does not need" },
+];
+
+const FOOTBALL_COMBINATION: ReadonlyArray<{
+  name: string;
+  blurb: string;
+  requires: Clause;
+}> = [
+  { name: "Matchup Nightmare", blurb: "cannot be covered", requires: { all: [["hands","S"],["deep_routes","S"],["contested_catch","S"]] } },
+  { name: "Slot Machine", blurb: "lives underneath", requires: { all: [["short_routes","G"],["quickness","S"]] } },
+  { name: "Grab-n-Go", blurb: "catch it and gone", requires: { all: [["hands","S"],["yac","G"]] } },
+  { name: "Double Me", blurb: "needs two defenders", requires: { all: [["contested_catch","G"],["hands","G"]] } },
+  { name: "Take the Top Off", blurb: "one step and it is over", requires: { all: [["speed","G"],["deep_routes","G"]] } },
+  { name: "Two-Way", blurb: "wins on both sides of it", requires: { all: [["man_coverage","S"]], any: [["hands","S"],["short_routes","S"]] } },
+  { name: "Lockdown", blurb: "takes their best", requires: { all: [["man_coverage","G"],["quickness","S"]] } },
+  { name: "Ballhawk", blurb: "picks, not pass breakups", requires: { all: [["zone_awareness","G"],["man_coverage","S"]] } },
+  { name: "Unstoppable Force", blurb: "the count is not long enough", requires: { all: [["pass_rush","G"],["speed","S"]] } },
+  { name: "Field General", blurb: "reads it and delivers", requires: { all: [["throwing","G"],["zone_awareness","S"]] } },
+  { name: "Escape Artist", blurb: "the rush does not end the play", requires: { all: [["throwing","S"],["quickness","G"]] } },
+  { name: "Dual Threat", blurb: "throws it or catches it", requires: { all: [["throwing","S"]], any: [["hands","S"],["short_routes","S"]] } },
+  { name: "Iron Man", blurb: "still going both ways late", requires: { all: [["stamina","G"]], any: [["man_coverage","S"],["short_routes","S"]] } },
+  { name: "Possession Target", blurb: "moves the chains", requires: { all: [["hands","G"],["contested_catch","S"]] } },
+  { name: "Gadget Player", blurb: "just get him the ball", requires: { all: [["quickness","S"],["yac","S"],["short_routes","S"]] } },
+];
+
+/** Every attribute at Bronze. Named per sport; the rule is the same. */
+const COMPLETE = {
+  basketball: { name: "Swiss Army", blurb: "no holes anywhere" },
+  football: { name: "Complete Player", blurb: "no holes anywhere" },
+} as const;
+
+type Catalogue = {
+  attribute: typeof BASKETBALL_ATTRIBUTE;
+  signature: typeof BASKETBALL_SIGNATURE;
+  combination: typeof BASKETBALL_COMBINATION;
+  complete: { name: string; blurb: string };
+};
+
+/**
+ * A sport's badges. Looked up by id rather than merged, because a badge list is
+ * written against the attributes a sport actually has - the coverage badges
+ * mean nothing without a coverage number, and a shared list would fire the
+ * wrong ones or none at all.
+ */
+const CATALOGUES: Record<string, Catalogue> = {
+  basketball: {
+    attribute: BASKETBALL_ATTRIBUTE,
+    signature: BASKETBALL_SIGNATURE,
+    combination: BASKETBALL_COMBINATION,
+    complete: COMPLETE.basketball,
+  },
+  football: {
+    attribute: FOOTBALL_ATTRIBUTE,
+    signature: FOOTBALL_SIGNATURE,
+    combination: FOOTBALL_COMBINATION,
+    complete: COMPLETE.football,
+  },
+};
 
 /* ------------------------------------------------------------------ *
  * Derivation
@@ -234,11 +334,13 @@ export function deriveBadges(
   roster: ReadonlyArray<{ ratings: Record<string, number> }>,
   stats: Map<string, { mean: number; sd: number }> = residualStats(config, roster),
 ): Badge[] {
+  const catalogue = CATALOGUES[config.id];
+  if (!catalogue) return [];
   const has = new Set(config.attributes.map((a) => a.key));
   const value = (key: string) => ratings[key] ?? RATING_MIN;
   const badges: Badge[] = [];
 
-  for (const spec of ATTRIBUTE_BADGES) {
+  for (const spec of catalogue.attribute) {
     if (!has.has(spec.attribute)) continue;
     const tier = tierFor(value(spec.attribute));
     if (!tier) continue;
@@ -255,7 +357,7 @@ export function deriveBadges(
   }
 
   const overall = computeOverall(config, ratings);
-  for (const spec of SIGNATURE_BADGES) {
+  for (const spec of catalogue.signature) {
     if (!has.has(spec.attribute)) continue;
     const stat = stats.get(spec.attribute);
     // A zero spread means every player is lopsided identically, which is not a
@@ -276,7 +378,7 @@ export function deriveBadges(
   const meets = ([key, cut]: string[]) =>
     has.has(key) && value(key) >= CUT[cut as keyof typeof CUT];
 
-  for (const spec of COMBINATION_BADGES) {
+  for (const spec of catalogue.combination) {
     const all = spec.requires.all ?? [];
     const any = spec.requires.any ?? [];
     // A clause naming an attribute this sport does not have can never be met,
@@ -297,10 +399,10 @@ export function deriveBadges(
 
   if (config.attributes.every((a) => value(a.key) >= CUT.B)) {
     badges.push({
-      key: `combo_${slug(SWISS_ARMY.name)}`,
-      name: SWISS_ARMY.name,
+      key: `combo_${slug(catalogue.complete.name)}`,
+      name: catalogue.complete.name,
       family: "combination",
-      blurb: SWISS_ARMY.blurb,
+      blurb: catalogue.complete.blurb,
       attributes: config.attributes.map((a) => a.key),
       score: Math.min(...config.attributes.map((a) => value(a.key))) / RATING_MAX,
     });

@@ -113,7 +113,16 @@ export async function savePlayer(input: SavePlayerInput) {
     });
 
   revalidatePath(`/${sport}`);
-  return { playerId };
+  /*
+   * Return what was actually STORED, not what was sent.
+   *
+   * `clean` clamps to the scale and defaults anything unparseable, so the row
+   * that lands can differ from the row that was submitted. The client used to
+   * render its own input back, which meant a clamped value showed one number on
+   * screen and held another in the database until the next reload - and read as
+   * "editing on the site does not reach the database".
+   */
+  return { playerId, name, position, ratings, overall, heightInches };
 }
 
 /** Removes the player from this sport, and entirely if they play no others. */

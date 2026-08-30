@@ -10,7 +10,6 @@ import RunTab from "@/components/RunTab";
 import SportShards from "@/components/SportShards";
 import { Button, EmptyState, Rating } from "@/components/ui";
 import {
-  computeOverall,
   formatHeight,
   sportChrome,
   type SportConfig,
@@ -29,6 +28,7 @@ export default function SportApp({
 }) {
   const [tab, setTab] = useState<Tab>("run");
   const [roster, setRoster] = useState(initialRoster);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   /** The player whose ratings are being read. Viewing is never gated. */
   const [viewing, setViewing] = useState<RosterEntry | null>(null);
@@ -51,18 +51,36 @@ export default function SportApp({
     ratings: Record<string, number>;
     heightInches: number | null;
   }) {
+    setSaveError(null);
     startTransition(async () => {
-      const { playerId } = await savePlayer({ ...input, sport: config.id });
+      let saved;
+      try {
+        saved = await savePlayer({ ...input, sport: config.id });
+      } catch {
+        /*
+         * A failed save used to leave the editor open with no explanation,
+         * because every line after the throw simply did not run. The common
+         * cause is the passcode having lapsed, which is fixable but only if
+         * somebody is told about it.
+         */
+        setSaveError("Couldn't save — check that editing is still unlocked.");
+        return;
+      }
+      /*
+       * Built from what the SERVER stored, never from what was typed. The
+       * server clamps to the scale, so echoing the input back could leave the
+       * screen showing a number the database does not hold.
+       */
       const entry: RosterEntry = {
-        id: playerId,
-        name: input.name.trim(),
-        position: input.position,
-        ratings: input.ratings,
-        heightInches: input.heightInches,
-        overall: computeOverall(config, input.ratings),
+        id: saved.playerId,
+        name: saved.name,
+        position: saved.position,
+        ratings: saved.ratings,
+        heightInches: saved.heightInches,
+        overall: saved.overall,
       };
       setRoster((prev) => {
-        const without = prev.filter((p) => p.id !== playerId);
+        const without = prev.filter((p) => p.id !== saved.playerId);
         return [...without, entry].sort(
           (x, y) => y.overall - x.overall || x.name.localeCompare(y.name),
         );
@@ -197,7 +215,11 @@ export default function SportApp({
           config={config}
           target={editor}
           busy={pending}
-          onClose={() => setEditor(null)}
+          error={saveError}
+          onClose={() => {
+            setSaveError(null);
+            setEditor(null);
+          }}
           onSave={handleSave}
           onDelete={handleDelete}
         />

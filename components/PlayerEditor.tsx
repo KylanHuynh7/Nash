@@ -22,6 +22,7 @@ export default function PlayerEditor({
   onSave,
   onDelete,
   busy,
+  error,
 }: {
   config: SportConfig;
   target: EditorTarget;
@@ -35,6 +36,8 @@ export default function PlayerEditor({
   }) => void;
   onDelete?: (playerId: string) => void;
   busy: boolean;
+  /** Why the last save failed, if it did. Shown next to the button that did it. */
+  error?: string | null;
 }) {
   const existing = target.mode === "edit" ? target.player : null;
   const [name, setName] = useState(existing?.name ?? "");
@@ -241,6 +244,13 @@ export default function PlayerEditor({
             );
           })}
         </div>
+
+        {/* Sits with the button that failed, not at the top of a scrolled sheet. */}
+        {error && (
+          <p className="mt-5 rounded-lg border border-amber-400/40 bg-amber-400/15 px-3 py-2 text-xs text-amber-200">
+            {error}
+          </p>
+        )}
 
         <div className="mt-7 flex gap-2">
           <Button variant="ghost" onClick={onClose} className="flex-1">
