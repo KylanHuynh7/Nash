@@ -9,6 +9,7 @@ import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
 import RunTab from "@/components/RunTab";
 import SportShards from "@/components/SportShards";
 import { Button, EmptyState, Rating } from "@/components/ui";
+import { competitionRanks, rankLabel } from "@/lib/rank";
 import {
   formatHeight,
   sportChrome,
@@ -191,7 +192,11 @@ export default function SportApp({
           key={viewing.id}
           config={config}
           player={viewing}
-          rank={roster.findIndex((p) => p.id === viewing.id) + 1}
+          rank={
+            competitionRanks(roster.map((p) => p.overall))[
+              roster.findIndex((p) => p.id === viewing.id)
+            ]
+          }
           of={roster.length}
           onClose={() => setViewing(null)}
           onEdit={() => requestEdit({ mode: "edit", player: viewing })}
@@ -276,6 +281,8 @@ function RosterList({
   }
 
   const positions = new Map(config.positions.map((p) => [p.key, p]));
+  // Roster order is the display order, which is what a rank has to describe.
+  const ranks = competitionRanks(roster.map((p) => p.overall));
 
   return (
     <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -286,9 +293,12 @@ function RosterList({
             className="group flex w-full items-center gap-3 rounded-lg border border-line bg-surface py-3 pl-3 pr-4 text-left shadow-[var(--shadow-card)] transition hover:border-accent hover:bg-raised active:translate-y-px"
           >
             {/* The list is sorted by rating, so say so — otherwise the order is
-                information the eye has to reconstruct from the numbers. */}
-            <span className="figure w-6 shrink-0 text-center text-xs font-semibold text-muted/70">
-              {i + 1}
+                information the eye has to reconstruct from the numbers. Players
+                showing the same overall share a rank and are marked T: the sort
+                breaks their tie alphabetically, and printing that as an ordinal
+                would claim an order the ratings never computed. */}
+            <span className="figure w-8 shrink-0 text-center text-xs font-semibold text-muted/70">
+              {rankLabel(ranks[i])}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] font-semibold tracking-[-0.01em]">

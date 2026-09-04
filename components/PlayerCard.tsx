@@ -11,6 +11,7 @@ import {
 } from "@/lib/sports";
 import { getNbaComp, getPlayerComps, type RosterEntry } from "@/app/actions";
 import { authoredComp } from "@/lib/comps";
+import type { Ranked } from "@/lib/rank";
 import {
   deriveBadges,
   featured,
@@ -45,7 +46,7 @@ export default function PlayerCard({
    */
   roster: RosterEntry[];
   /** Where they sit on the board, so a number has something to mean. */
-  rank: number;
+  rank: Ranked;
   of: number;
   onClose: () => void;
   onEdit: () => void;
@@ -200,7 +201,10 @@ export default function PlayerCard({
             <h2 className="truncate text-lg font-semibold">{player.name}</h2>
             <p className="text-sm text-muted">
               {position?.full ?? player.position}
-              {height && <> · {height}</>} · #{rank} of {of}
+              {height && <> · {height}</>} ·{" "}
+              {/* "tied #8" rather than "#8": players showing the same overall
+                  share a rank, and the roster list marks them T. */}
+              {rank.tied ? "tied " : ""}#{rank.rank} of {of}
             </p>
           </div>
           <button

@@ -9,6 +9,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { RATING_MAX, RATING_MIN, SPORTS, formatHeight, isSportId } from "../lib/sports";
+import { competitionRanks, rankLabel } from "../lib/rank";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -53,10 +54,15 @@ const header = [
 
 const lines = [header.map(cell).join(",")];
 
+// Players showing the same overall share a rank and are marked T, exactly as
+// the app prints them. A reviewer marking this sheet up is the person least
+// served by an order the ratings never computed.
+const ranks = competitionRanks(rows.map((r) => Number(r.overall)));
+
 rows.forEach((r, i) => {
   lines.push(
     [
-      i + 1,
+      rankLabel(ranks[i]),
       r.name,
       r.position,
       formatHeight(r.height_inches) ?? "",
