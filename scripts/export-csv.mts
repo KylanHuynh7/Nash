@@ -9,7 +9,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import { RATING_MAX, RATING_MIN, SPORTS, formatHeight, isSportId } from "../lib/sports";
-import { competitionRanks, rankLabel } from "../lib/rank";
+import { competitionRanks } from "../lib/rank";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -42,6 +42,7 @@ const cell = (value: unknown) => {
 // Lowercase attribute headers so `rate.ts --file` can read this back directly.
 const header = [
   "rank",
+  "tied",
   "name",
   "position",
   "height",
@@ -54,15 +55,23 @@ const header = [
 
 const lines = [header.map(cell).join(",")];
 
-// Players showing the same overall share a rank and are marked T, exactly as
-// the app prints them. A reviewer marking this sheet up is the person least
-// served by an order the ratings never computed.
+/*
+ * Players showing the same overall share a rank, so a reviewer marking this
+ * sheet up never reads an order the ratings never computed.
+ *
+ * `rank` stays a NUMBER and the tie is flagged in its own column. A "T7" in
+ * the rank cell says the same thing to a person and something invalid to
+ * everything else: the first analysis run against a T-marked sheet silently
+ * dropped eight of seventeen players by filtering on a numeric rank. A
+ * repeated 7 is honest on its own, and it still parses.
+ */
 const ranks = competitionRanks(rows.map((r) => Number(r.overall)));
 
 rows.forEach((r, i) => {
   lines.push(
     [
-      rankLabel(ranks[i]),
+      ranks[i].rank,
+      ranks[i].tied ? "yes" : "",
       r.name,
       r.position,
       formatHeight(r.height_inches) ?? "",
