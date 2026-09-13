@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getEditAccess, getRoster } from "@/app/actions";
 import SportApp from "@/components/SportApp";
+import { decodeWeights } from "@/lib/playground";
 import { SPORTS, SPORT_IDS, isSportId } from "@/lib/sports";
 import type { RosterEntry } from "@/app/actions";
 
@@ -11,11 +12,19 @@ export function generateStaticParams() {
   }));
 }
 
-export default async function SportPage({ params }: PageProps<"/[sport]">) {
+export default async function SportPage({
+  params,
+  searchParams,
+}: PageProps<"/[sport]">) {
   const { sport } = await params;
   if (!isSportId(sport) || SPORTS[sport].comingSoon) notFound();
 
   const config = SPORTS[sport];
+
+  // A shared playground version. Validated here so the client never renders
+  // weights the sliders could not have produced.
+  const { w } = await searchParams;
+  const initialWeights = typeof w === "string" ? decodeWeights(config, w) : null;
 
   let roster: RosterEntry[] = [];
   let setupError: string | null = null;
@@ -46,5 +55,12 @@ export default async function SportPage({ params }: PageProps<"/[sport]">) {
 
   const access = await getEditAccess();
 
-  return <SportApp config={config} initialRoster={roster} access={access} />;
+  return (
+    <SportApp
+      config={config}
+      initialRoster={roster}
+      access={access}
+      initialWeights={initialWeights}
+    />
+  );
 }

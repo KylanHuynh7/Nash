@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Nash",
   description:
-    "Store the roster once. Pick who showed up. Get teams no swap can improve.",
+    "The group's rankings, and a playground for arguing about the weights.",
 };
 
 export const viewport: Viewport = {

@@ -33,8 +33,8 @@ export default function Home() {
             className="mt-5 max-w-sm text-[15px] font-medium leading-relaxed"
             style={{ color: "#43506e" }}
           >
-            The roster lives here. Tap who showed up, get teams no swap can
-            improve. No re-explaining everybody every single time.
+            The group&apos;s rankings live here. Argue about the weights in the
+            playground, where nothing you try touches the real list.
           </p>
         </header>
 
@@ -93,7 +93,7 @@ export default function Home() {
                     {sport.label}
                   </span>
                   <span className="block text-sm text-white/70">
-                    {sport.sideSize}-a-side · {sport.attributes.length} attributes
+                    {sport.attributes.length} attributes
                   </span>
                 </span>
                 <span

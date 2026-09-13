@@ -6,9 +6,10 @@ import { removePlayer, savePlayer, type RosterEntry } from "@/app/actions";
 import PasscodeGate from "@/components/PasscodeGate";
 import PlayerCard from "@/components/PlayerCard";
 import PlayerEditor, { type EditorTarget } from "@/components/PlayerEditor";
-import RunTab from "@/components/RunTab";
 import SportShards from "@/components/SportShards";
+import WeightsPlayground from "@/components/WeightsPlayground";
 import { Button, EmptyState, Rating } from "@/components/ui";
+import type { FamilyWeights } from "@/lib/playground";
 import { competitionRanks, rankLabel } from "@/lib/rank";
 import {
   formatHeight,
@@ -16,18 +17,29 @@ import {
   type SportConfig,
 } from "@/lib/sports";
 
-type Tab = "run" | "roster";
+/*
+ * The team builder (RunTab) is hidden, not deleted: the group turned out to
+ * care about the list and the weights, not about building sides (2026-09-12).
+ * Its code, the balancer and saved /run links all still work - it is simply no
+ * longer a tab. Restoring it is an import and a tab entry.
+ */
+type Tab = "rankings" | "playground";
 
 export default function SportApp({
   config,
   initialRoster,
   access,
+  initialWeights = null,
 }: {
   config: SportConfig;
   initialRoster: RosterEntry[];
   access: { gated: boolean; unlocked: boolean };
+  /** Weights from a shared playground link; opens on that tab when present. */
+  initialWeights?: FamilyWeights | null;
 }) {
-  const [tab, setTab] = useState<Tab>("run");
+  const [tab, setTab] = useState<Tab>(
+    initialWeights ? "playground" : "rankings",
+  );
   const [roster, setRoster] = useState(initialRoster);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
@@ -132,7 +144,7 @@ export default function SportApp({
               {config.label}
             </h1>
             <p className="eyebrow mt-1">
-              {roster.length} rated · {config.sideSize}-a-side
+              {roster.length} rated
             </p>
           </div>
         </div>
@@ -151,8 +163,8 @@ export default function SportApp({
       >
         {(
           [
-            ["run", "Run it"],
-            ["roster", `Roster · ${roster.length}`],
+            ["rankings", `Rankings · ${roster.length}`],
+            ["playground", "Playground"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -171,18 +183,19 @@ export default function SportApp({
         ))}
       </div>
 
-      {tab === "roster" && roster.length > 0 && (
+      {tab === "rankings" && roster.length > 0 && (
         <CompareInvite config={config} />
       )}
 
-      {tab === "run" ? (
-        <RunTab
+      {tab === "rankings" ? (
+        <RosterList config={config} roster={roster} onOpen={setViewing} />
+      ) : (
+        <WeightsPlayground
           config={config}
           roster={roster}
-          onAddPlayer={() => requestEdit({ mode: "new" })}
+          initialWeights={initialWeights}
+          onOpen={setViewing}
         />
-      ) : (
-        <RosterList config={config} roster={roster} onOpen={setViewing} />
       )}
 
       {viewing && (
